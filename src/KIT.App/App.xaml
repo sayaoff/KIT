@@ -1,0 +1,12 @@
+<Application x:Class="KIT.App.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Application.Resources>
+        <SolidColorBrush x:Key="WindowBackground" Color="#101318" />
+        <SolidColorBrush x:Key="PanelBackground" Color="#191E25" />
+        <SolidColorBrush x:Key="PrimaryText" Color="#F4F7FA" />
+        <SolidColorBrush x:Key="SecondaryText" Color="#A9B3BF" />
+        <SolidColorBrush x:Key="Accent" Color="#70E0A3" />
+    </Application.Resources>
+</Application>
+

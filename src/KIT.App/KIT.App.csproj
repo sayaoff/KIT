@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <AssemblyName>KIT</AssemblyName>
+    <RootNamespace>KIT.App</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\KIT.Core\KIT.Core.csproj" />
+    <ProjectReference Include="..\KIT.Data\KIT.Data.csproj" />
+    <ProjectReference Include="..\KIT.Infrastructure.Windows\KIT.Infrastructure.Windows.csproj" />
+  </ItemGroup>
+</Project>

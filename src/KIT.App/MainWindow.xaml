@@ -1,0 +1,109 @@
+<Window x:Class="KIT.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="KIT Alpha" Width="940" Height="720" MinWidth="760" MinHeight="600"
+        Background="{StaticResource WindowBackground}" Foreground="{StaticResource PrimaryText}"
+        WindowStartupLocation="CenterScreen">
+    <Grid Margin="28">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="18" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <Grid>
+            <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+            <StackPanel>
+                <TextBlock Text="KIT" FontSize="30" FontWeight="SemiBold" />
+                <TextBlock Text="Alpha · Counter-Strike 2" Margin="0,3,0,0"
+                           Foreground="{StaticResource SecondaryText}" />
+            </StackPanel>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                <Ellipse x:Name="StatusDot" Width="9" Height="9" Margin="0,1,9,0"
+                         Fill="{StaticResource SecondaryText}" />
+                <TextBlock x:Name="StatusText" Text="Starting…" MaxWidth="440" TextWrapping="Wrap" />
+            </StackPanel>
+        </Grid>
+
+        <TabControl Grid.Row="2" Background="{StaticResource PanelBackground}"
+                    Foreground="{StaticResource PrimaryText}" BorderThickness="0">
+            <TabItem Header="Home">
+                <Grid Margin="22">
+                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="20"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+                    <Border Padding="20" CornerRadius="10" Background="#20262E">
+                        <Grid>
+                            <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                            <StackPanel Margin="0,0,20,0">
+                                <TextBlock Text="Counter-Strike 2" FontSize="17" FontWeight="SemiBold" />
+                                <TextBlock x:Name="ExecutablePathText" Text="No executable selected" Margin="0,8,0,0"
+                                           TextWrapping="Wrap" Foreground="{StaticResource SecondaryText}" />
+                                <TextBlock x:Name="ActiveKitText" Text="Active Kit: Vanilla" Margin="0,10,0,0"
+                                           Foreground="{StaticResource Accent}" />
+                            </StackPanel>
+                            <Button Grid.Column="1" x:Name="SelectExecutableButton" Content="Select cs2.exe"
+                                    Click="SelectExecutable_Click" Padding="18,10" VerticalAlignment="Top" />
+                        </Grid>
+                    </Border>
+                    <Grid Grid.Row="2">
+                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="10"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+                        <TextBlock Text="Session activity" FontSize="16" FontWeight="SemiBold" />
+                        <TextBox Grid.Row="2" x:Name="ActivityText" Text="No activity yet." IsReadOnly="True"
+                                 Padding="14" BorderThickness="0" Background="#20262E"
+                                 Foreground="{StaticResource SecondaryText}" TextWrapping="Wrap"
+                                 VerticalScrollBarVisibility="Auto" FontFamily="Consolas" FontSize="12" />
+                    </Grid>
+                </Grid>
+            </TabItem>
+
+            <TabItem Header="Kits">
+                <Grid Margin="22">
+                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="18"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+                    <Grid>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="220"/><ColumnDefinition Width="12"/><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                        <ComboBox x:Name="KitSelector" DisplayMemberPath="Name" SelectionChanged="KitSelector_SelectionChanged" />
+                        <TextBox Grid.Column="2" x:Name="KitNameText" Padding="8,5" />
+                        <StackPanel Grid.Column="3" Orientation="Horizontal" Margin="12,0,0,0">
+                            <Button Content="New" Click="NewKit_Click" Padding="13,7" Margin="0,0,7,0" />
+                            <Button x:Name="SaveKitButton" Content="Save" Click="SaveKit_Click" Padding="13,7" Margin="0,0,7,0" />
+                            <Button x:Name="ActivateKitButton" Content="Make active" Click="ActivateKit_Click" Padding="13,7" Margin="0,0,7,0" />
+                            <Button x:Name="DeleteKitButton" Content="Delete" Click="DeleteKit_Click" Padding="13,7" />
+                        </StackPanel>
+                    </Grid>
+
+                    <Grid Grid.Row="2">
+                        <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="18"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                        <Border Padding="18" CornerRadius="10" Background="#20262E">
+                            <Grid>
+                                <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="10"/><RowDefinition Height="*"/><RowDefinition Height="10"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                                <TextBlock Text="Clean Mode" FontSize="17" FontWeight="SemiBold" />
+                                <TextBlock Grid.Row="1" Margin="0,5,0,0" TextWrapping="Wrap"
+                                           Foreground="{StaticResource SecondaryText}"
+                                           Text="Apps closed gracefully when CS2 starts and reopened after it ends. Unsaved-work prompts are never bypassed." />
+                                <ListBox Grid.Row="3" x:Name="CleanAppsList" DisplayMemberPath="DisplayName" Background="#151A20"
+                                         Foreground="{StaticResource PrimaryText}" BorderThickness="0" />
+                                <StackPanel Grid.Row="5" Orientation="Horizontal">
+                                    <Button x:Name="AddCleanButton" Content="Add .exe" Click="AddCleanApp_Click" Padding="12,7" Margin="0,0,7,0" />
+                                    <Button x:Name="RemoveCleanButton" Content="Remove" Click="RemoveCleanApp_Click" Padding="12,7" />
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                        <Border Grid.Column="2" Padding="18" CornerRadius="10" Background="#20262E">
+                            <Grid>
+                                <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="10"/><RowDefinition Height="*"/><RowDefinition Height="10"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                                <TextBlock Text="Launch Apps" FontSize="17" FontWeight="SemiBold" />
+                                <TextBlock Grid.Row="1" Margin="0,5,0,0" TextWrapping="Wrap"
+                                           Foreground="{StaticResource SecondaryText}"
+                                           Text="Apps started with CS2 and closed gracefully when the session ends. Already-running apps are left untouched." />
+                                <ListBox Grid.Row="3" x:Name="LaunchAppsList" DisplayMemberPath="DisplayName" Background="#151A20"
+                                         Foreground="{StaticResource PrimaryText}" BorderThickness="0" />
+                                <StackPanel Grid.Row="5" Orientation="Horizontal">
+                                    <Button x:Name="AddLaunchButton" Content="Add .exe" Click="AddLaunchApp_Click" Padding="12,7" Margin="0,0,7,0" />
+                                    <Button x:Name="RemoveLaunchButton" Content="Remove" Click="RemoveLaunchApp_Click" Padding="12,7" />
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                    </Grid>
+                </Grid>
+            </TabItem>
+        </TabControl>
+    </Grid>
+</Window>
