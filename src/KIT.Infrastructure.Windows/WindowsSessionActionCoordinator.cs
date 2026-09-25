@@ -6,7 +6,7 @@ namespace KIT.Infrastructure.Windows;
 
 public sealed class WindowsSessionActionCoordinator : ISessionActionCoordinator
 {
-    private static readonly TimeSpan GracefulCloseTimeout = TimeSpan.FromSeconds(8);
+    private static readonly TimeSpan GracefulCloseTimeout = TimeSpan.FromSeconds(2);
 
     public async Task<ActionExecutionResult> ApplyAsync(KitDefinition kit, DateTimeOffset appliedAtUtc,
         CancellationToken cancellationToken = default)
@@ -23,7 +23,8 @@ public sealed class WindowsSessionActionCoordinator : ISessionActionCoordinator
             {
                 using (process)
                 {
-                    if (await TryCloseGracefullyAsync(process, target.DisplayName, warnings, cancellationToken))
+                    if (await StopProcessAsync(process, target.DisplayName, forceAfterTimeout: true,
+                            warnings, cancellationToken))
                         closedAny = true;
                 }
             }
@@ -73,7 +74,8 @@ public sealed class WindowsSessionActionCoordinator : ISessionActionCoordinator
             if (!WindowsProcessFinder.ProcessMatches(launched.ProcessId, launched.ExecutablePath, out var process))
                 continue;
             using (process)
-                await TryCloseGracefullyAsync(process!, Path.GetFileNameWithoutExtension(launched.ExecutablePath), warnings, cancellationToken);
+                await StopProcessAsync(process!, Path.GetFileNameWithoutExtension(launched.ExecutablePath),
+                    forceAfterTimeout: true, warnings, cancellationToken);
         }
 
         foreach (var closed in state.ClosedApplications)
@@ -103,26 +105,31 @@ public sealed class WindowsSessionActionCoordinator : ISessionActionCoordinator
         return new RestoreExecutionResult(warnings);
     }
 
-    private static async Task<bool> TryCloseGracefullyAsync(Process process, string displayName,
-        ICollection<string> warnings, CancellationToken cancellationToken)
+    private static async Task<bool> StopProcessAsync(Process process, string displayName,
+        bool forceAfterTimeout, ICollection<string> warnings, CancellationToken cancellationToken)
     {
         try
         {
             if (process.HasExited) return false;
-            if (!process.CloseMainWindow())
+            var closeRequested = process.CloseMainWindow();
+            if (closeRequested)
             {
-                warnings.Add($"{displayName} has no closable window; it was left running.");
-                return false;
+                using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                timeout.CancelAfter(GracefulCloseTimeout);
+                try
+                {
+                    await process.WaitForExitAsync(timeout.Token);
+                    return true;
+                }
+                catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+                {
+                }
             }
 
-            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            timeout.CancelAfter(GracefulCloseTimeout);
-            try { await process.WaitForExitAsync(timeout.Token); }
-            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
-            {
-                warnings.Add($"{displayName} did not close in time; it was not forced.");
-                return false;
-            }
+            if (!forceAfterTimeout) return false;
+            process.Kill(entireProcessTree: true);
+            await process.WaitForExitAsync(cancellationToken);
+            warnings.Add($"{displayName} stayed active in the background and was terminated for Clean Mode.");
             return true;
         }
         catch (InvalidOperationException) { return false; }

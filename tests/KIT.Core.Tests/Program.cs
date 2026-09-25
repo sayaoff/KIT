@@ -10,7 +10,8 @@ var tests = new (string Name, Func<Task> Run)[]
     ("creates and activates a Kit", ManagesKitsAsync),
     ("recovers actions after an interrupted session", RecoversInterruptedSessionAsync),
     ("rejects a non-CS2 executable", RejectsNonCs2ExecutableAsync),
-    ("persists configuration as JSON", PersistsConfigurationAsync)
+    ("persists configuration as JSON", PersistsConfigurationAsync),
+    ("persists language preference", PersistsLanguagePreferenceAsync)
 };
 var failures = new List<string>();
 foreach (var test in tests)
@@ -106,6 +107,18 @@ static async Task PersistsConfigurationAsync()
         var expected = new GameConfiguration(@"C:\Steam\cs2.exe");
         await repository.SaveAsync(expected);
         Assert(await repository.LoadAsync() == expected, "Configuration did not round-trip.");
+    }
+    finally { if (Directory.Exists(directory)) Directory.Delete(directory, true); }
+}
+
+static async Task PersistsLanguagePreferenceAsync()
+{
+    var directory = Path.Combine(Path.GetTempPath(), "kit-preferences-" + Guid.NewGuid().ToString("N"));
+    try
+    {
+        var repository = new JsonUserPreferencesRepository(new LocalDataPaths(directory));
+        await repository.SaveAsync(new UserPreferences("ru"));
+        Assert((await repository.LoadAsync()).Language == "ru", "Language preference did not round-trip.");
     }
     finally { if (Directory.Exists(directory)) Directory.Delete(directory, true); }
 }

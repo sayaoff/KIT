@@ -17,17 +17,23 @@ public partial class MainWindow : Window
 {
     private readonly GameTrackingService _trackingService;
     private readonly LocalDataPaths _dataPaths;
+    private readonly JsonUserPreferencesRepository _preferencesRepository;
     private readonly Forms.NotifyIcon _trayIcon;
     private readonly List<ApplicationTarget> _cleanApps = [];
     private readonly List<ApplicationTarget> _launchApps = [];
+    private readonly List<ActivityEvent> _activity = [];
     private bool _reloadingCatalog;
+    private bool _changingLanguage;
     private bool _allowClose;
+    private TrackingStatus? _lastStatus;
 
-    public MainWindow(GameTrackingService trackingService, LocalDataPaths dataPaths)
+    public MainWindow(GameTrackingService trackingService, LocalDataPaths dataPaths,
+        JsonUserPreferencesRepository preferencesRepository, string language)
     {
         InitializeComponent();
         _trackingService = trackingService;
         _dataPaths = dataPaths;
+        _preferencesRepository = preferencesRepository;
         _trackingService.StatusChanged += TrackingService_StatusChanged;
         _trackingService.ActivityRecorded += TrackingService_ActivityRecorded;
         _trackingService.CatalogChanged += TrackingService_CatalogChanged;
@@ -42,13 +48,19 @@ public partial class MainWindow : Window
         };
         _trayIcon.DoubleClick += (_, _) => RestoreWindow();
         Closed += (_, _) => _trayIcon.Dispose();
+
+        _changingLanguage = true;
+        LanguageSelector.ItemsSource = new[] { new LanguageOption("en", "English"), new LanguageOption("ru", "Русский") };
+        LanguageSelector.SelectedItem = ((IEnumerable<LanguageOption>)LanguageSelector.ItemsSource)
+            .First(option => option.Code == (language == "ru" ? "ru" : "en"));
+        _changingLanguage = false;
     }
 
     private Forms.ContextMenuStrip BuildTrayMenu()
     {
         var menu = new Forms.ContextMenuStrip();
-        menu.Items.Add("Open KIT", null, (_, _) => RestoreWindow());
-        menu.Items.Add("Exit", null, (_, _) => Dispatcher.Invoke(RequestExit));
+        menu.Items.Add(S("TrayOpen"), null, (_, _) => RestoreWindow());
+        menu.Items.Add(S("TrayExit"), null, (_, _) => Dispatcher.Invoke(RequestExit));
         return menu;
     }
 
@@ -59,20 +71,17 @@ public partial class MainWindow : Window
             await _trackingService.StartAsync();
             ShowConfiguredPath();
             ReloadCatalog(_trackingService.Catalog.ActiveKitId);
-            var activity = await _trackingService.ReadRecentActivityAsync();
-            ActivityText.Text = activity.Count == 0
-                ? "No activity yet."
-                : string.Join(Environment.NewLine, activity.Select(FormatActivity));
-            ActivityText.ScrollToEnd();
+            _activity.AddRange(await _trackingService.ReadRecentActivityAsync());
+            RenderActivity();
         }
-        catch (Exception exception) { ShowError("KIT could not start.", exception); }
+        catch (Exception exception) { ShowError(S("ErrorStart"), exception); }
     }
 
     private async void SelectExecutable_Click(object sender, RoutedEventArgs e)
     {
         var dialog = new WpfOpenFileDialog
         {
-            Title = "Locate Counter-Strike 2", Filter = "Counter-Strike 2 (cs2.exe)|cs2.exe",
+            Title = S("LocateCs2"), Filter = "Counter-Strike 2 (cs2.exe)|cs2.exe",
             CheckFileExists = true, Multiselect = false
         };
         if (_trackingService.Configuration is { } configuration)
@@ -83,7 +92,7 @@ public partial class MainWindow : Window
         {
             await _trackingService.ConfigureAsync(dialog.FileName);
             ShowConfiguredPath();
-        }, "KIT could not use the selected executable.");
+        }, S("ErrorExecutable"));
     }
 
     private void KitSelector_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
@@ -94,7 +103,7 @@ public partial class MainWindow : Window
 
     private async void NewKit_Click(object sender, RoutedEventArgs e)
     {
-        var baseName = "New Kit";
+        var baseName = S("NewKit");
         var name = baseName;
         var suffix = 2;
         while (_trackingService.Catalog.Kits.Any(kit => string.Equals(kit.Name, name, StringComparison.OrdinalIgnoreCase)))
@@ -105,7 +114,7 @@ public partial class MainWindow : Window
             ReloadCatalog(kit.Id);
             KitNameText.Focus();
             KitNameText.SelectAll();
-        }, "Could not create the Kit.");
+        }, S("ErrorCreate"));
     }
 
     private async void SaveKit_Click(object sender, RoutedEventArgs e)
@@ -121,7 +130,7 @@ public partial class MainWindow : Window
         {
             await _trackingService.SaveKitAsync(updated);
             ReloadCatalog(updated.Id);
-        }, "Could not save the Kit.");
+        }, S("ErrorSave"));
     }
 
     private async void ActivateKit_Click(object sender, RoutedEventArgs e)
@@ -131,41 +140,43 @@ public partial class MainWindow : Window
         {
             await _trackingService.SetActiveKitAsync(selected.Id);
             ReloadCatalog(selected.Id);
-        }, "Could not activate the Kit.");
+        }, S("ErrorActivate"));
     }
 
     private async void DeleteKit_Click(object sender, RoutedEventArgs e)
     {
         if (KitSelector.SelectedItem is not KitDefinition selected || selected.IsVanilla) return;
-        if (WpfMessageBox.Show(this, $"Delete ‘{selected.Name}’?", "KIT", MessageBoxButton.YesNo,
+        if (WpfMessageBox.Show(this, string.Format(S("DeletePrompt"), selected.Name), "KIT", MessageBoxButton.YesNo,
                 MessageBoxImage.Question) is not MessageBoxResult.Yes) return;
         await RunUiActionAsync(async () =>
         {
             await _trackingService.DeleteKitAsync(selected.Id);
             ReloadCatalog(_trackingService.Catalog.ActiveKitId);
-        }, "Could not delete the Kit.");
+        }, S("ErrorDelete"));
     }
 
-    private void AddCleanApp_Click(object sender, RoutedEventArgs e) => AddApplication(_cleanApps, CleanAppsList);
-    private void AddLaunchApp_Click(object sender, RoutedEventArgs e) => AddApplication(_launchApps, LaunchAppsList);
+    private void AddCleanApp_Click(object sender, RoutedEventArgs e) => AddApplication(_cleanApps, CleanAppsList, isCleanMode: true);
+    private void AddLaunchApp_Click(object sender, RoutedEventArgs e) => AddApplication(_launchApps, LaunchAppsList, isCleanMode: false);
     private void RemoveCleanApp_Click(object sender, RoutedEventArgs e) => RemoveApplication(_cleanApps, CleanAppsList);
     private void RemoveLaunchApp_Click(object sender, RoutedEventArgs e) => RemoveApplication(_launchApps, LaunchAppsList);
 
-    private void AddApplication(List<ApplicationTarget> targets, System.Windows.Controls.ListBox listBox)
+    private void AddApplication(List<ApplicationTarget> targets, System.Windows.Controls.ListBox listBox, bool isCleanMode)
     {
         var dialog = new WpfOpenFileDialog
         {
-            Title = "Select an application", Filter = "Windows applications (*.exe)|*.exe",
+            Title = S("SelectApplication"), Filter = "Windows applications (*.exe)|*.exe",
             CheckFileExists = true, Multiselect = false
         };
         if (dialog.ShowDialog(this) is not true) return;
         if (_trackingService.Configuration is { } configuration &&
             string.Equals(Path.GetFullPath(dialog.FileName), configuration.ExecutablePath, StringComparison.OrdinalIgnoreCase))
         {
-            WpfMessageBox.Show(this, "CS2 cannot be added as a Kit action.", "KIT",
+            WpfMessageBox.Show(this, S("Cs2ActionError"), "KIT",
                 MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
+        if (isCleanMode && WpfMessageBox.Show(this, S("CleanConfirm"), S("CleanConfirmTitle"),
+                MessageBoxButton.YesNo, MessageBoxImage.Warning) is not MessageBoxResult.Yes) return;
         if (targets.Any(target => string.Equals(target.ExecutablePath, dialog.FileName, StringComparison.OrdinalIgnoreCase))) return;
         targets.Add(new ApplicationTarget(Path.GetFullPath(dialog.FileName), Path.GetFileNameWithoutExtension(dialog.FileName)));
         RefreshTargetList(listBox, targets);
@@ -213,7 +224,7 @@ public partial class MainWindow : Window
                                    ?? _trackingService.ActiveKit;
         _reloadingCatalog = false;
         if (KitSelector.SelectedItem is KitDefinition selected) LoadKitEditor(selected);
-        ActiveKitText.Text = $"Active Kit: {_trackingService.ActiveKit.Name}";
+        ActiveKitText.Text = string.Format(S("ActiveKitFormat"), _trackingService.ActiveKit.Name);
     }
 
     private void TrackingService_CatalogChanged(object? sender, KitCatalog catalog) =>
@@ -221,7 +232,8 @@ public partial class MainWindow : Window
 
     private void TrackingService_StatusChanged(object? sender, TrackingStatus status) => Dispatcher.Invoke(() =>
     {
-        StatusText.Text = status.Message;
+        _lastStatus = status;
+        StatusText.Text = FormatStatus(status);
         StatusDot.Fill = status.State switch
         {
             TrackingState.GameRunning => new SolidColorBrush(WpfColor.FromRgb(112, 224, 163)),
@@ -233,22 +245,56 @@ public partial class MainWindow : Window
 
     private void TrackingService_ActivityRecorded(object? sender, ActivityEvent activity) => Dispatcher.Invoke(() =>
     {
-        ActivityText.Text = ActivityText.Text == "No activity yet."
-            ? FormatActivity(activity)
-            : ActivityText.Text + Environment.NewLine + FormatActivity(activity);
-        ActivityText.ScrollToEnd();
+        _activity.Add(activity);
+        RenderActivity();
     });
 
-    private static string FormatActivity(ActivityEvent activity)
+    private string FormatActivity(ActivityEvent activity)
     {
         var duration = activity.Duration is null ? "" : $" · {activity.Duration.Value:g}";
         var kit = activity.KitName is null ? "" : $" · {activity.KitName}";
         var details = activity.Details is null ? "" : $" · {activity.Details}";
-        return $"{activity.OccurredAtUtc.ToLocalTime():yyyy-MM-dd HH:mm:ss}  {activity.Kind}{kit}{duration}{details}";
+        var eventName = S("Activity" + activity.Kind);
+        return $"{activity.OccurredAtUtc.ToLocalTime():yyyy-MM-dd HH:mm:ss}  {eventName}{kit}{duration}{details}";
     }
 
     private void ShowConfiguredPath() =>
-        ExecutablePathText.Text = _trackingService.Configuration?.ExecutablePath ?? "No executable selected";
+        ExecutablePathText.Text = _trackingService.Configuration?.ExecutablePath ?? S("NoExecutable");
+
+    private void RenderActivity()
+    {
+        ActivityText.Text = _activity.Count == 0
+            ? S("NoActivity")
+            : string.Join(Environment.NewLine, _activity.Select(FormatActivity));
+        ActivityText.ScrollToEnd();
+    }
+
+    private string FormatStatus(TrackingStatus status) => status.State switch
+    {
+        TrackingState.NotConfigured => S("StatusNotConfigured"),
+        TrackingState.Watching => string.Format(S("StatusWatching"), _trackingService.ActiveKit.Name),
+        TrackingState.GameRunning => string.Format(S("StatusRunning"), _trackingService.ActiveKit.Name),
+        TrackingState.Stopped => S("StatusStopped"),
+        _ => status.Message
+    };
+
+    private async void LanguageSelector_SelectionChanged(object sender,
+        System.Windows.Controls.SelectionChangedEventArgs e)
+    {
+        if (_changingLanguage || LanguageSelector.SelectedItem is not LanguageOption selected) return;
+        App.ApplyLanguage(selected.Code);
+        await _preferencesRepository.SaveAsync(new UserPreferences(selected.Code));
+        ShowConfiguredPath();
+        ActiveKitText.Text = string.Format(S("ActiveKitFormat"), _trackingService.ActiveKit.Name);
+        if (_lastStatus is not null) StatusText.Text = FormatStatus(_lastStatus);
+        RenderActivity();
+        var oldMenu = _trayIcon.ContextMenuStrip;
+        _trayIcon.ContextMenuStrip = BuildTrayMenu();
+        oldMenu?.Dispose();
+    }
+
+    private static string S(string key) =>
+        System.Windows.Application.Current.TryFindResource(key) as string ?? key;
 
     private async Task RunUiActionAsync(Func<Task> action, string heading)
     {
@@ -257,7 +303,7 @@ public partial class MainWindow : Window
     }
 
     private void ShowError(string heading, Exception exception) =>
-        WpfMessageBox.Show(this, $"{heading}\n\n{exception.Message}\n\nData folder: {_dataPaths.RootDirectory}",
+        WpfMessageBox.Show(this, $"{heading}\n\n{exception.Message}\n\n{string.Format(S("DataFolder"), _dataPaths.RootDirectory)}",
             "KIT", MessageBoxButton.OK, MessageBoxImage.Error);
 
     private void MainWindow_Closing(object? sender, CancelEventArgs e)
@@ -285,4 +331,6 @@ public partial class MainWindow : Window
         _trayIcon.Visible = false;
         System.Windows.Application.Current.Shutdown();
     }
+
+    private sealed record LanguageOption(string Code, string Name);
 }
