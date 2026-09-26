@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Threading;
 using KIT.Core.Services;
 using KIT.Data;
 using KIT.Infrastructure.Windows;
@@ -19,45 +20,66 @@ public partial class App : System.Windows.Application
     {
         base.OnStartup(e);
 
+        var paths = new LocalDataPaths();
+        DispatcherUnhandledException += (_, args) =>
+            StartupDiagnostics.Write(paths, "Unhandled UI error: " + args.Exception);
         _activationEvent = new EventWaitHandle(false, EventResetMode.AutoReset, ActivationEventName);
         _instanceMutex = new Mutex(true, InstanceMutexName, out var isFirstInstance);
         _ownsInstanceMutex = isFirstInstance;
         if (!isFirstInstance)
         {
+            StartupDiagnostics.Write(paths, "Secondary launch requested window activation.");
             _activationEvent.Set();
             Shutdown();
             return;
         }
 
-        var paths = new LocalDataPaths();
-        var preferences = new JsonUserPreferencesRepository(paths);
-        var savedPreferences = preferences.LoadAsync().GetAwaiter().GetResult();
-        ApplyLanguage(savedPreferences.Language);
-        ApplyAppearance(savedPreferences.Theme, savedPreferences.VisualStyle);
-        _trackingService = new GameTrackingService(
-            new JsonGameConfigurationRepository(paths),
-            new JsonKitRepository(paths),
-            new JsonRecoveryStateRepository(paths),
-            new JsonLinesActivityLog(paths),
-            new JsonLinesSessionRepository(paths),
-            new PollingGameProcessWatcher(),
-            new WindowsProcessResourceMonitor(),
-            new WindowsGameProcessInspector(),
-            new WindowsSessionActionCoordinator(),
-            new SystemClock());
+        StartupDiagnostics.Write(paths, "Primary instance acquired.");
+        try
+        {
+            var preferences = new JsonUserPreferencesRepository(paths);
+            var savedPreferences = preferences.LoadAsync().GetAwaiter().GetResult();
+            ApplyLanguage(savedPreferences.Language);
+            ApplyAppearance(savedPreferences.Theme, savedPreferences.VisualStyle);
+            _trackingService = new GameTrackingService(
+                new JsonGameConfigurationRepository(paths),
+                new JsonKitRepository(paths),
+                new JsonRecoveryStateRepository(paths),
+                new JsonLinesActivityLog(paths),
+                new JsonLinesSessionRepository(paths),
+                new PollingGameProcessWatcher(),
+                new WindowsProcessResourceMonitor(),
+                new WindowsGameProcessInspector(),
+                new WindowsSessionActionCoordinator(),
+                new SystemClock());
 
-        var mainWindow = new MainWindow(_trackingService, paths, preferences, savedPreferences);
-        MainWindow = mainWindow;
-        _activationRegistration = ThreadPool.RegisterWaitForSingleObject(
-            _activationEvent,
-            (_, timedOut) =>
-            {
-                if (!timedOut) Dispatcher.BeginInvoke(mainWindow.RestoreFromExternalLaunch);
-            },
-            null,
-            Timeout.Infinite,
-            executeOnlyOnce: false);
-        mainWindow.Show();
+            var mainWindow = new MainWindow(_trackingService, paths, preferences, savedPreferences);
+            MainWindow = mainWindow;
+            _activationRegistration = ThreadPool.RegisterWaitForSingleObject(
+                _activationEvent,
+                (_, timedOut) =>
+                {
+                    if (!timedOut) Dispatcher.BeginInvoke(mainWindow.RestoreFromExternalLaunch);
+                },
+                null,
+                Timeout.Infinite,
+                executeOnlyOnce: false);
+
+            // Show a real, populated first frame before reading history, recovery state,
+            // or starting process monitoring. A slow disk must never turn KIT into an
+            // unexplained background-only process.
+            mainWindow.Show();
+            mainWindow.Activate();
+            StartupDiagnostics.Write(paths, "Main window shown.");
+            Dispatcher.BeginInvoke(DispatcherPriority.ContextIdle, mainWindow.BeginInitialization);
+        }
+        catch (Exception exception)
+        {
+            StartupDiagnostics.Write(paths, "Fatal startup error: " + exception);
+            System.Windows.MessageBox.Show($"KIT could not open.\n\n{exception.Message}\n\nLog: {paths.StartupLogFile}",
+                "KIT", MessageBoxButton.OK, MessageBoxImage.Error);
+            Shutdown(-1);
+        }
     }
 
     public static void ApplyLanguage(string language)

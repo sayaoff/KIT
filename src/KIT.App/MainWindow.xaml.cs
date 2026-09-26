@@ -29,6 +29,7 @@ public partial class MainWindow : Window
     private string _currentTheme;
     private string _currentVisualStyle;
     private bool _initializingAppearance;
+    private bool _initializationStarted;
     private bool _startupComplete;
     private TrackingState? _previousTrackingState;
     private TrackingStatus? _lastStatus;
@@ -49,7 +50,6 @@ public partial class MainWindow : Window
         _trackingService.CatalogChanged += TrackingService_CatalogChanged;
         _trackingService.ResourceSampled += TrackingService_ResourceSampled;
         _trackingService.SessionSaved += TrackingService_SessionSaved;
-        Loaded += MainWindow_Loaded;
         Closing += MainWindow_Closing;
         _trayIcon = new Forms.NotifyIcon
         {
@@ -85,8 +85,16 @@ public partial class MainWindow : Window
         return menu;
     }
 
-    private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
+    public void BeginInitialization()
     {
+        if (_initializationStarted) return;
+        _initializationStarted = true;
+        _ = InitializeAsync();
+    }
+
+    private async Task InitializeAsync()
+    {
+        StartupDiagnostics.Write(_dataPaths, "Background initialization started.");
         try
         {
             await _trackingService.StartAsync();
@@ -96,8 +104,13 @@ public partial class MainWindow : Window
             RenderActivity();
             _sessions.AddRange(await _trackingService.ReadRecentSessionsAsync());
             RenderSessions();
+            StartupDiagnostics.Write(_dataPaths, "Background initialization completed.");
         }
-        catch (Exception exception) { ShowError(S("ErrorStart"), exception); }
+        catch (Exception exception)
+        {
+            StartupDiagnostics.Write(_dataPaths, "Initialization error: " + exception);
+            ShowError(S("ErrorStart"), exception);
+        }
         finally { _startupComplete = true; }
     }
 
@@ -486,7 +499,11 @@ public partial class MainWindow : Window
         });
     }
 
-    public void RestoreFromExternalLaunch() => RestoreWindow();
+    public void RestoreFromExternalLaunch()
+    {
+        StartupDiagnostics.Write(_dataPaths, "Existing instance received an activation request.");
+        RestoreWindow();
+    }
 
     private void RequestExit()
     {
