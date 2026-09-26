@@ -22,6 +22,10 @@
     <sys:String x:Key="PeakValueFormat">Пик {0}</sys:String>
     <sys:String x:Key="RecentActivity">Последние действия</sys:String>
     <sys:String x:Key="ViewSessions">Все сессии</sys:String>
+    <sys:String x:Key="FirstRunTitle">Настроим KIT</sys:String>
+    <sys:String x:Key="FirstRunDescription">Для начала укажите установленный Counter-Strike 2. KIT будет отслеживать только выбранный cs2.exe.</sys:String>
+    <sys:String x:Key="FirstRunSteps">1. Выберите cs2.exe   ·   2. Создайте Kit   ·   3. Запустите игру</sys:String>
+    <sys:String x:Key="FirstRunStart">Выбрать cs2.exe</sys:String>
     <sys:String x:Key="KitsTab">Киты</sys:String>
     <sys:String x:Key="SessionsTab">Сессии</sys:String>
     <sys:String x:Key="SettingsTab">Настройки</sys:String>
@@ -37,6 +41,10 @@
     <sys:String x:Key="DarkThemeDescription">Тёмно-серые поверхности для работы при слабом освещении.</sys:String>
     <sys:String x:Key="LightTheme">Светлая</sys:String>
     <sys:String x:Key="LightThemeDescription">Светлые нейтральные поверхности с читаемым тёмным текстом.</sys:String>
+    <sys:String x:Key="StartupAndData">Запуск и данные</sys:String>
+    <sys:String x:Key="StartWithWindows">Запускать KIT вместе с Windows</sys:String>
+    <sys:String x:Key="StartWithWindowsDescription">KIT запустится свёрнутым в системный трей без запроса прав администратора. Ручной запуск всегда открывает окно.</sys:String>
+    <sys:String x:Key="OpenDataFolder">Открыть папку данных и логов</sys:String>
     <sys:String x:Key="SessionHistory">История сессий</sys:String>
     <sys:String x:Key="SessionDate">Начало</sys:String>
     <sys:String x:Key="KitColumn">Кит</sys:String>
@@ -72,6 +80,8 @@
     <sys:String x:Key="ErrorSave">Не удалось сохранить Kit.</sys:String>
     <sys:String x:Key="ErrorActivate">Не удалось активировать Kit.</sys:String>
     <sys:String x:Key="ErrorDelete">Не удалось удалить Kit.</sys:String>
+    <sys:String x:Key="ErrorStartupSetting">Не удалось изменить автозапуск.</sys:String>
+    <sys:String x:Key="ErrorOpenDataFolder">Не удалось открыть папку данных.</sys:String>
     <sys:String x:Key="DataFolder">Папка данных: {0}</sys:String>
     <sys:String x:Key="NewKit">Новый Kit</sys:String>
     <sys:String x:Key="ActivitySessionStarted">Сессия началась</sys:String>

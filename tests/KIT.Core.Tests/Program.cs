@@ -126,10 +126,10 @@ static async Task PersistsLanguagePreferenceAsync()
         var migrated = await repository.LoadAsync();
         Assert(migrated == new UserPreferences("ru", "dark", "calm"),
             "Legacy language preference did not receive appearance defaults.");
-        await repository.SaveAsync(new UserPreferences("ru", "light", "aggressive"));
+        await repository.SaveAsync(new UserPreferences("ru", "light", "aggressive", true));
         var saved = await repository.LoadAsync();
-        Assert(saved == new UserPreferences("ru", "light", "aggressive"),
-            "Appearance preferences did not round-trip.");
+        Assert(saved == new UserPreferences("ru", "light", "aggressive", true),
+            "Appearance and startup preferences did not round-trip.");
         Assert(repository.Load() == saved,
             "Synchronous startup preference loading did not match async loading.");
     }

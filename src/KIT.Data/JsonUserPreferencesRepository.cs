@@ -5,7 +5,8 @@ namespace KIT.Data;
 public sealed record UserPreferences(
     string Language = "en",
     string Theme = "dark",
-    string VisualStyle = "calm");
+    string VisualStyle = "calm",
+    bool StartWithWindows = false);
 
 public sealed class JsonUserPreferencesRepository
 {

@@ -5,6 +5,7 @@ using System.Windows.Media;
 using KIT.Core.Models;
 using KIT.Core.Services;
 using KIT.Data;
+using KIT.Infrastructure.Windows;
 using Forms = System.Windows.Forms;
 using Drawing = System.Drawing;
 using WpfColor = System.Windows.Media.Color;
@@ -18,6 +19,7 @@ public partial class MainWindow : Window
     private readonly GameTrackingService _trackingService;
     private readonly LocalDataPaths _dataPaths;
     private readonly JsonUserPreferencesRepository _preferencesRepository;
+    private readonly WindowsStartupRegistration _startupRegistration;
     private readonly Forms.NotifyIcon _trayIcon;
     private readonly List<ApplicationTarget> _cleanApps = [];
     private readonly List<ApplicationTarget> _launchApps = [];
@@ -28,7 +30,9 @@ public partial class MainWindow : Window
     private string _currentLanguage;
     private string _currentTheme;
     private string _currentVisualStyle;
+    private bool _startWithWindows;
     private bool _initializingAppearance;
+    private bool _initializingStartupSetting;
     private bool _initializationStarted;
     private bool _startupComplete;
     private TrackingState? _previousTrackingState;
@@ -36,15 +40,18 @@ public partial class MainWindow : Window
     private ResourceSample? _lastResourceSample;
 
     public MainWindow(GameTrackingService trackingService, LocalDataPaths dataPaths,
-        JsonUserPreferencesRepository preferencesRepository, UserPreferences preferences)
+        JsonUserPreferencesRepository preferencesRepository, UserPreferences preferences,
+        WindowsStartupRegistration startupRegistration)
     {
         InitializeComponent();
         _trackingService = trackingService;
         _dataPaths = dataPaths;
         _preferencesRepository = preferencesRepository;
+        _startupRegistration = startupRegistration;
         _currentLanguage = preferences.Language == "ru" ? "ru" : "en";
         _currentTheme = preferences.Theme == "light" ? "light" : "dark";
         _currentVisualStyle = preferences.VisualStyle == "aggressive" ? "aggressive" : "calm";
+        _startWithWindows = preferences.StartWithWindows;
         _trackingService.StatusChanged += TrackingService_StatusChanged;
         _trackingService.ActivityRecorded += TrackingService_ActivityRecorded;
         _trackingService.CatalogChanged += TrackingService_CatalogChanged;
@@ -66,6 +73,11 @@ public partial class MainWindow : Window
         (_currentVisualStyle == "aggressive" ? AggressiveStyleChoice : CalmStyleChoice).IsChecked = true;
         (_currentTheme == "light" ? LightThemeChoice : DarkThemeChoice).IsChecked = true;
         _initializingAppearance = false;
+        _initializingStartupSetting = true;
+        try { _startWithWindows = _startupRegistration.IsEnabled(); }
+        catch (Exception exception) { StartupDiagnostics.Write(_dataPaths, "Startup setting read failed: " + exception); }
+        StartWithWindowsToggle.IsChecked = _startWithWindows;
+        _initializingStartupSetting = false;
 
         // Checked fires while InitializeComponent is still constructing the visual tree,
         // so select and render Home explicitly before the first frame is shown.
@@ -312,8 +324,12 @@ public partial class MainWindow : Window
         RenderSessions();
     });
 
-    private void ShowConfiguredPath() =>
+    private void ShowConfiguredPath()
+    {
+        var configured = _trackingService.Configuration is not null;
         ExecutablePathText.Text = _trackingService.Configuration?.ExecutablePath ?? S("NoExecutable");
+        FirstRunPanel.Visibility = configured ? Visibility.Collapsed : Visibility.Visible;
+    }
 
     private void RenderActivity()
     {
@@ -452,7 +468,42 @@ public partial class MainWindow : Window
     }
 
     private Task SavePreferencesAsync() =>
-        _preferencesRepository.SaveAsync(new UserPreferences(_currentLanguage, _currentTheme, _currentVisualStyle));
+        _preferencesRepository.SaveAsync(new UserPreferences(
+            _currentLanguage, _currentTheme, _currentVisualStyle, _startWithWindows));
+
+    private async void StartWithWindows_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_initializingStartupSetting) return;
+        var enabled = StartWithWindowsToggle.IsChecked is true;
+        try
+        {
+            _startupRegistration.SetEnabled(enabled);
+            _startWithWindows = enabled;
+            await SavePreferencesAsync();
+        }
+        catch (Exception exception)
+        {
+            StartupDiagnostics.Write(_dataPaths, "Startup setting update failed: " + exception);
+            _initializingStartupSetting = true;
+            StartWithWindowsToggle.IsChecked = _startWithWindows;
+            _initializingStartupSetting = false;
+            ShowError(S("ErrorStartupSetting"), exception);
+        }
+    }
+
+    private void OpenDataFolder_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            Directory.CreateDirectory(_dataPaths.RootDirectory);
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = _dataPaths.RootDirectory,
+                UseShellExecute = true
+            });
+        }
+        catch (Exception exception) { ShowError(S("ErrorOpenDataFolder"), exception); }
+    }
 
     private void EditActiveKit_Click(object sender, RoutedEventArgs e)
     {

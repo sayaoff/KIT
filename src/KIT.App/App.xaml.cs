@@ -55,7 +55,8 @@ public partial class App : System.Windows.Application
                 new WindowsSessionActionCoordinator(),
                 new SystemClock());
 
-            var mainWindow = new MainWindow(_trackingService, paths, preferences, savedPreferences);
+            var mainWindow = new MainWindow(_trackingService, paths, preferences, savedPreferences,
+                new WindowsStartupRegistration());
             MainWindow = mainWindow;
             _activationRegistration = ThreadPool.RegisterWaitForSingleObject(
                 _activationEvent,
@@ -67,12 +68,21 @@ public partial class App : System.Windows.Application
                 Timeout.Infinite,
                 executeOnlyOnce: false);
 
-            // Show a real, populated first frame before reading history, recovery state,
-            // or starting process monitoring. A slow disk must never turn KIT into an
-            // unexplained background-only process.
-            mainWindow.Show();
-            mainWindow.Activate();
-            StartupDiagnostics.Write(paths, "Main window shown.");
+            var startInBackground = e.Args.Any(argument =>
+                string.Equals(argument, "--background", StringComparison.OrdinalIgnoreCase));
+            if (!startInBackground)
+            {
+                // Show a real, populated first frame before reading history, recovery state,
+                // or starting process monitoring. A slow disk must never turn KIT into an
+                // unexplained background-only process.
+                mainWindow.Show();
+                mainWindow.Activate();
+                StartupDiagnostics.Write(paths, "Main window shown.");
+            }
+            else
+            {
+                StartupDiagnostics.Write(paths, "Started in tray by Windows startup.");
+            }
             Dispatcher.BeginInvoke(DispatcherPriority.ContextIdle, mainWindow.BeginInitialization);
         }
         catch (Exception exception)

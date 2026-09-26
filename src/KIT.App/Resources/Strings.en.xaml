@@ -22,6 +22,10 @@
     <sys:String x:Key="PeakValueFormat">Peak {0}</sys:String>
     <sys:String x:Key="RecentActivity">Recent activity</sys:String>
     <sys:String x:Key="ViewSessions">View sessions</sys:String>
+    <sys:String x:Key="FirstRunTitle">Set up KIT</sys:String>
+    <sys:String x:Key="FirstRunDescription">Start by locating Counter-Strike 2. KIT will monitor only the cs2.exe you select.</sys:String>
+    <sys:String x:Key="FirstRunSteps">1. Select cs2.exe   ·   2. Create a Kit   ·   3. Start the game</sys:String>
+    <sys:String x:Key="FirstRunStart">Select cs2.exe</sys:String>
     <sys:String x:Key="KitsTab">Kits</sys:String>
     <sys:String x:Key="SessionsTab">Sessions</sys:String>
     <sys:String x:Key="SettingsTab">Settings</sys:String>
@@ -37,6 +41,10 @@
     <sys:String x:Key="DarkThemeDescription">Dark gray surfaces for low-light use.</sys:String>
     <sys:String x:Key="LightTheme">Light</sys:String>
     <sys:String x:Key="LightThemeDescription">Bright neutral surfaces with readable dark text.</sys:String>
+    <sys:String x:Key="StartupAndData">Startup and data</sys:String>
+    <sys:String x:Key="StartWithWindows">Start KIT with Windows</sys:String>
+    <sys:String x:Key="StartWithWindowsDescription">KIT starts in the system tray without administrator rights. A manual launch always opens the window.</sys:String>
+    <sys:String x:Key="OpenDataFolder">Open data and logs folder</sys:String>
     <sys:String x:Key="SessionHistory">Session history</sys:String>
     <sys:String x:Key="SessionDate">Started</sys:String>
     <sys:String x:Key="KitColumn">Kit</sys:String>
@@ -72,6 +80,8 @@
     <sys:String x:Key="ErrorSave">Could not save the Kit.</sys:String>
     <sys:String x:Key="ErrorActivate">Could not activate the Kit.</sys:String>
     <sys:String x:Key="ErrorDelete">Could not delete the Kit.</sys:String>
+    <sys:String x:Key="ErrorStartupSetting">Could not change the startup setting.</sys:String>
+    <sys:String x:Key="ErrorOpenDataFolder">Could not open the data folder.</sys:String>
     <sys:String x:Key="DataFolder">Data folder: {0}</sys:String>
     <sys:String x:Key="NewKit">New Kit</sys:String>
     <sys:String x:Key="ActivitySessionStarted">Session started</sys:String>

@@ -136,12 +136,28 @@
                     <Grid Margin="32,0,32,24">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
                             <RowDefinition Height="14" />
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="20" />
                             <RowDefinition Height="*" />
                         </Grid.RowDefinitions>
-                        <Border Style="{StaticResource SectionCard}">
+                        <Border x:Name="FirstRunPanel" Style="{StaticResource SectionCard}" Margin="0,0,0,14"
+                                BorderBrush="{DynamicResource Accent}">
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                <StackPanel Margin="0,0,24,0">
+                                    <TextBlock Text="{DynamicResource FirstRunTitle}" FontSize="18" FontWeight="SemiBold" />
+                                    <TextBlock Text="{DynamicResource FirstRunDescription}" Margin="0,5,0,12"
+                                               Foreground="{DynamicResource SecondaryText}" TextWrapping="Wrap" />
+                                    <TextBlock Text="{DynamicResource FirstRunSteps}" FontSize="12" TextWrapping="Wrap" />
+                                </StackPanel>
+                                <Button Grid.Column="1" Content="{DynamicResource FirstRunStart}" Click="SelectExecutable_Click"
+                                        Padding="17,9" VerticalAlignment="Center" />
+                            </Grid>
+                        </Border>
+
+                        <Border Grid.Row="1" Style="{StaticResource SectionCard}">
                             <Grid>
                                 <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                                 <StackPanel Margin="0,0,28,0">
@@ -169,7 +185,7 @@
                             </Grid>
                         </Border>
 
-                        <UniformGrid Grid.Row="2" Columns="3">
+                        <UniformGrid Grid.Row="3" Columns="3">
                             <Border Style="{StaticResource SectionCard}" Margin="0,0,10,0">
                                 <StackPanel><TextBlock Text="{DynamicResource LastSession}" FontSize="11" Foreground="{DynamicResource SecondaryText}" />
                                     <TextBlock x:Name="LastSessionDurationText" Margin="0,7,0,0" FontSize="20" FontWeight="SemiBold" />
@@ -187,7 +203,7 @@
                             </Border>
                         </UniformGrid>
 
-                        <Grid Grid.Row="4">
+                        <Grid Grid.Row="5">
                             <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="9"/><RowDefinition Height="*"/></Grid.RowDefinitions>
                             <Grid>
                                 <TextBlock Text="{DynamicResource RecentActivity}" FontSize="14" FontWeight="SemiBold" />
@@ -232,7 +248,7 @@
                         </Grid>
                         <Grid Grid.Row="2">
                             <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="16"/><ColumnDefinition/></Grid.ColumnDefinitions>
-                            <Border Style="{StaticResource SectionCard}">
+                            <Border Style="{StaticResource SectionCard}" Margin="0,0,0,16">
                                 <Grid>
                                     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="12"/><RowDefinition Height="*"/><RowDefinition Height="12"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                                     <TextBlock Text="{DynamicResource CleanMode}" FontSize="16" FontWeight="SemiBold" />
@@ -308,7 +324,7 @@
                                     </UniformGrid>
                                 </StackPanel>
                             </Border>
-                            <Border Style="{StaticResource SectionCard}">
+                            <Border Style="{StaticResource SectionCard}" Margin="0,0,0,16">
                                 <StackPanel>
                                     <TextBlock Text="{DynamicResource ColorTheme}" FontSize="16" FontWeight="SemiBold" />
                                     <TextBlock Text="{DynamicResource ColorThemeDescription}" Margin="0,5,0,16"
@@ -327,6 +343,20 @@
                                                            Foreground="{DynamicResource SecondaryText}" TextWrapping="Wrap" /></StackPanel>
                                         </RadioButton>
                                     </UniformGrid>
+                                </StackPanel>
+                            </Border>
+                            <Border Style="{StaticResource SectionCard}">
+                                <StackPanel>
+                                    <TextBlock Text="{DynamicResource StartupAndData}" FontSize="16" FontWeight="SemiBold" />
+                                    <CheckBox x:Name="StartWithWindowsToggle" Margin="0,15,0,0"
+                                              Checked="StartWithWindows_Changed" Unchecked="StartWithWindows_Changed"
+                                              Foreground="{DynamicResource PrimaryText}">
+                                        <TextBlock Text="{DynamicResource StartWithWindows}" FontWeight="SemiBold" />
+                                    </CheckBox>
+                                    <TextBlock Text="{DynamicResource StartWithWindowsDescription}" Margin="20,5,0,15"
+                                               Foreground="{DynamicResource SecondaryText}" TextWrapping="Wrap" />
+                                    <Button Content="{DynamicResource OpenDataFolder}" Click="OpenDataFolder_Click"
+                                            HorizontalAlignment="Left" Padding="14,8" />
                                 </StackPanel>
                             </Border>
                         </StackPanel>
