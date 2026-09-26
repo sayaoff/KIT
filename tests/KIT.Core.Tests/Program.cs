@@ -130,6 +130,8 @@ static async Task PersistsLanguagePreferenceAsync()
         var saved = await repository.LoadAsync();
         Assert(saved == new UserPreferences("ru", "light", "aggressive"),
             "Appearance preferences did not round-trip.");
+        Assert(repository.Load() == saved,
+            "Synchronous startup preference loading did not match async loading.");
     }
     finally { if (Directory.Exists(directory)) Directory.Delete(directory, true); }
 }

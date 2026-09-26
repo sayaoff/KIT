@@ -38,7 +38,9 @@ public partial class App : System.Windows.Application
         try
         {
             var preferences = new JsonUserPreferencesRepository(paths);
-            var savedPreferences = preferences.LoadAsync().GetAwaiter().GetResult();
+            // preferences.json is tiny. Reading it synchronously here avoids blocking
+            // the WPF dispatcher on an async continuation before a window exists.
+            var savedPreferences = preferences.Load();
             ApplyLanguage(savedPreferences.Language);
             ApplyAppearance(savedPreferences.Theme, savedPreferences.VisualStyle);
             _trackingService = new GameTrackingService(
@@ -117,7 +119,7 @@ public partial class App : System.Windows.Application
         _activationEvent?.Dispose();
         if (_trackingService is not null)
         {
-            _trackingService.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            Task.Run(async () => await _trackingService.DisposeAsync()).GetAwaiter().GetResult();
         }
 
         if (_ownsInstanceMutex)

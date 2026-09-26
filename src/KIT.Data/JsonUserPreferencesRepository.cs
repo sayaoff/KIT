@@ -14,6 +14,21 @@ public sealed class JsonUserPreferencesRepository
 
     public JsonUserPreferencesRepository(LocalDataPaths paths) => _paths = paths;
 
+    public UserPreferences Load()
+    {
+        if (!File.Exists(_paths.PreferencesFile)) return new UserPreferences("en");
+        try
+        {
+            using var stream = File.OpenRead(_paths.PreferencesFile);
+            return JsonSerializer.Deserialize<UserPreferences>(stream, Options)
+                   ?? new UserPreferences("en");
+        }
+        catch (JsonException)
+        {
+            return new UserPreferences("en");
+        }
+    }
+
     public async Task<UserPreferences> LoadAsync(CancellationToken cancellationToken = default)
     {
         if (!File.Exists(_paths.PreferencesFile)) return new UserPreferences("en");
