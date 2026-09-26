@@ -2,28 +2,28 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="KIT Alpha" Width="1060" Height="720" MinWidth="900" MinHeight="620"
-        Background="{StaticResource WindowBackground}" Foreground="{StaticResource PrimaryText}"
+        Background="{DynamicResource WindowBackground}" Foreground="{DynamicResource PrimaryText}"
         FontFamily="Segoe UI" WindowStartupLocation="CenterScreen">
     <Window.Resources>
         <Style x:Key="NavigationItem" TargetType="RadioButton">
-            <Setter Property="Foreground" Value="{StaticResource SecondaryText}" />
+            <Setter Property="Foreground" Value="{DynamicResource SecondaryText}" />
             <Setter Property="FontSize" Value="14" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="Margin" Value="0,2" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="RadioButton">
-                        <Border x:Name="Root" Padding="14,10" CornerRadius="6" Background="Transparent">
+                        <Border x:Name="Root" Padding="14,10" CornerRadius="{DynamicResource ControlCornerRadius}" Background="Transparent">
                             <ContentPresenter VerticalAlignment="Center" />
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Root" Property="Background" Value="{StaticResource HoverBackground}" />
-                                <Setter Property="Foreground" Value="{StaticResource PrimaryText}" />
+                                <Setter TargetName="Root" Property="Background" Value="{DynamicResource HoverBackground}" />
+                                <Setter Property="Foreground" Value="{DynamicResource PrimaryText}" />
                             </Trigger>
                             <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="Root" Property="Background" Value="{StaticResource SelectedBackground}" />
-                                <Setter Property="Foreground" Value="{StaticResource PrimaryText}" />
+                                <Setter TargetName="Root" Property="Background" Value="{DynamicResource SelectedBackground}" />
+                                <Setter Property="Foreground" Value="{DynamicResource PrimaryText}" />
                                 <Setter Property="FontWeight" Value="SemiBold" />
                             </Trigger>
                         </ControlTemplate.Triggers>
@@ -41,11 +41,36 @@
             </Setter>
         </Style>
         <Style x:Key="SectionCard" TargetType="Border">
-            <Setter Property="Background" Value="{StaticResource PanelBackground}" />
-            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+            <Setter Property="Background" Value="{DynamicResource PanelBackground}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="CornerRadius" Value="{DynamicResource CardCornerRadius}" />
             <Setter Property="Padding" Value="20" />
+        </Style>
+        <Style x:Key="SettingChoice" TargetType="RadioButton">
+            <Setter Property="Foreground" Value="{DynamicResource PrimaryText}" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Margin" Value="0,0,10,0" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="ChoiceBorder" Padding="16" CornerRadius="{DynamicResource CardCornerRadius}"
+                                Background="{DynamicResource InsetBackground}" BorderBrush="{DynamicResource BorderBrush}"
+                                BorderThickness="1">
+                            <ContentPresenter />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ChoiceBorder" Property="Background" Value="{DynamicResource HoverBackground}" />
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="ChoiceBorder" Property="Background" Value="{DynamicResource SelectedBackground}" />
+                                <Setter TargetName="ChoiceBorder" Property="BorderBrush" Value="{DynamicResource Accent}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
     </Window.Resources>
 
@@ -55,7 +80,7 @@
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
-        <Border Background="{StaticResource SidebarBackground}" BorderBrush="{StaticResource BorderBrush}"
+        <Border Background="{DynamicResource SidebarBackground}" BorderBrush="{DynamicResource BorderBrush}"
                 BorderThickness="0,0,1,0">
             <Grid Margin="16,20,16,18">
                 <Grid.RowDefinitions>
@@ -68,7 +93,7 @@
                 <StackPanel Margin="12,0">
                     <TextBlock Text="KIT" FontSize="25" FontWeight="SemiBold" />
                     <TextBlock Text="ALPHA" Margin="1,2,0,0" FontSize="10" FontWeight="SemiBold"
-                               Foreground="{StaticResource SecondaryText}" />
+                               Foreground="{DynamicResource SecondaryText}" />
                 </StackPanel>
 
                 <StackPanel Grid.Row="2">
@@ -81,11 +106,14 @@
                     <RadioButton x:Name="SessionsNavigation" GroupName="Navigation"
                                  Style="{StaticResource NavigationItem}" Tag="2"
                                  Content="{DynamicResource SessionsTab}" Checked="Navigation_Checked" />
+                    <RadioButton x:Name="SettingsNavigation" GroupName="Navigation"
+                                 Style="{StaticResource NavigationItem}" Tag="3"
+                                 Content="{DynamicResource SettingsTab}" Checked="Navigation_Checked" />
                 </StackPanel>
 
                 <StackPanel Grid.Row="4">
                     <TextBlock Text="{DynamicResource LanguageLabel}" Margin="12,0,0,7" FontSize="11"
-                               Foreground="{StaticResource SecondaryText}" />
+                               Foreground="{DynamicResource SecondaryText}" />
                     <Button x:Name="LanguageToggleButton" Click="LanguageToggle_Click"
                             HorizontalContentAlignment="Left" Padding="12,8" />
                 </StackPanel>
@@ -103,7 +131,7 @@
                        Text="{DynamicResource HomeTab}" />
 
             <TabControl x:Name="MainTabs" Grid.Row="1" Style="{StaticResource HiddenTabs}"
-                        Background="Transparent" Foreground="{StaticResource PrimaryText}" BorderThickness="0">
+                        Background="Transparent" Foreground="{DynamicResource PrimaryText}" BorderThickness="0">
                 <TabItem>
                     <Grid Margin="32,0,32,24">
                         <Grid.RowDefinitions>
@@ -117,7 +145,7 @@
                                 <StackPanel Margin="0,0,24,0">
                                     <TextBlock Text="Counter-Strike 2" FontSize="17" FontWeight="SemiBold" />
                                     <TextBlock x:Name="ExecutablePathText" Text="{DynamicResource NoExecutable}" Margin="0,7,0,0"
-                                               TextWrapping="Wrap" Foreground="{StaticResource SecondaryText}" />
+                                               TextWrapping="Wrap" Foreground="{DynamicResource SecondaryText}" />
                                     <TextBlock x:Name="ActiveKitText" Margin="0,12,0,0" />
                                 </StackPanel>
                                 <Button Grid.Column="1" x:Name="SelectExecutableButton" Content="{DynamicResource SelectCs2}"
@@ -128,8 +156,8 @@
                             <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="10"/><RowDefinition Height="*"/></Grid.RowDefinitions>
                             <TextBlock Text="{DynamicResource SessionActivity}" FontSize="14" FontWeight="SemiBold" />
                             <TextBox Grid.Row="2" x:Name="ActivityText" Text="{DynamicResource NoActivity}" IsReadOnly="True"
-                                     Padding="16" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
-                                     Background="{StaticResource PanelBackground}" Foreground="{StaticResource SecondaryText}"
+                                     Padding="16" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
+                                     Background="{DynamicResource PanelBackground}" Foreground="{DynamicResource SecondaryText}"
                                      TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" FontFamily="Consolas" FontSize="12" />
                         </Grid>
                     </Grid>
@@ -156,9 +184,9 @@
                                     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="12"/><RowDefinition Height="*"/><RowDefinition Height="12"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                                     <TextBlock Text="{DynamicResource CleanMode}" FontSize="16" FontWeight="SemiBold" />
                                     <TextBlock Grid.Row="1" Margin="0,5,0,0" TextWrapping="Wrap" FontSize="12"
-                                               Foreground="{StaticResource SecondaryText}" Text="{DynamicResource CleanDescription}" />
+                                               Foreground="{DynamicResource SecondaryText}" Text="{DynamicResource CleanDescription}" />
                                     <ListBox Grid.Row="3" x:Name="CleanAppsList" DisplayMemberPath="DisplayName"
-                                             Background="{StaticResource InsetBackground}" Foreground="{StaticResource PrimaryText}" BorderThickness="0" />
+                                             Background="{DynamicResource InsetBackground}" Foreground="{DynamicResource PrimaryText}" BorderThickness="0" />
                                     <StackPanel Grid.Row="5" Orientation="Horizontal">
                                         <Button x:Name="AddCleanButton" Content="{DynamicResource AddExe}" Click="AddCleanApp_Click" Padding="11,6" Margin="0,0,6,0" />
                                         <Button x:Name="RemoveCleanButton" Content="{DynamicResource Remove}" Click="RemoveCleanApp_Click" Padding="11,6" />
@@ -170,9 +198,9 @@
                                     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="12"/><RowDefinition Height="*"/><RowDefinition Height="12"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                                     <TextBlock Text="{DynamicResource LaunchApps}" FontSize="16" FontWeight="SemiBold" />
                                     <TextBlock Grid.Row="1" Margin="0,5,0,0" TextWrapping="Wrap" FontSize="12"
-                                               Foreground="{StaticResource SecondaryText}" Text="{DynamicResource LaunchDescription}" />
+                                               Foreground="{DynamicResource SecondaryText}" Text="{DynamicResource LaunchDescription}" />
                                     <ListBox Grid.Row="3" x:Name="LaunchAppsList" DisplayMemberPath="DisplayName"
-                                             Background="{StaticResource InsetBackground}" Foreground="{StaticResource PrimaryText}" BorderThickness="0" />
+                                             Background="{DynamicResource InsetBackground}" Foreground="{DynamicResource PrimaryText}" BorderThickness="0" />
                                     <StackPanel Grid.Row="5" Orientation="Horizontal">
                                         <Button x:Name="AddLaunchButton" Content="{DynamicResource AddExe}" Click="AddLaunchApp_Click" Padding="11,6" Margin="0,0,6,0" />
                                         <Button x:Name="RemoveLaunchButton" Content="{DynamicResource Remove}" Click="RemoveLaunchApp_Click" Padding="11,6" />
@@ -187,9 +215,9 @@
                     <Grid Margin="32,0,32,24">
                         <DataGrid x:Name="SessionsGrid" AutoGenerateColumns="False" IsReadOnly="True"
                                   CanUserAddRows="False" CanUserDeleteRows="False" HeadersVisibility="Column"
-                                  Background="{StaticResource PanelBackground}" Foreground="{StaticResource PrimaryText}"
-                                  RowBackground="{StaticResource PanelBackground}" AlternatingRowBackground="{StaticResource InsetBackground}"
-                                  BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" GridLinesVisibility="Horizontal">
+                                  Background="{DynamicResource PanelBackground}" Foreground="{DynamicResource PrimaryText}"
+                                  RowBackground="{DynamicResource PanelBackground}" AlternatingRowBackground="{DynamicResource InsetBackground}"
+                                  BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" GridLinesVisibility="Horizontal">
                             <DataGrid.Columns>
                                 <DataGridTextColumn Header="{DynamicResource SessionDate}" Binding="{Binding Date}" Width="145" />
                                 <DataGridTextColumn Header="{DynamicResource KitColumn}" Binding="{Binding Kit}" Width="*" />
@@ -202,16 +230,65 @@
                         </DataGrid>
                     </Grid>
                 </TabItem>
+
+                <TabItem>
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <StackPanel Margin="32,0,32,24" MaxWidth="720" HorizontalAlignment="Left">
+                            <Border Style="{StaticResource SectionCard}" Margin="0,0,0,16">
+                                <StackPanel>
+                                    <TextBlock Text="{DynamicResource InterfaceStyle}" FontSize="16" FontWeight="SemiBold" />
+                                    <TextBlock Text="{DynamicResource InterfaceStyleDescription}" Margin="0,5,0,16"
+                                               Foreground="{DynamicResource SecondaryText}" TextWrapping="Wrap" />
+                                    <UniformGrid Columns="2">
+                                        <RadioButton x:Name="CalmStyleChoice" GroupName="VisualStyle" Tag="calm"
+                                                     Style="{StaticResource SettingChoice}" Checked="Appearance_Checked">
+                                            <StackPanel><TextBlock Text="{DynamicResource CalmStyle}" FontWeight="SemiBold" />
+                                                <TextBlock Text="{DynamicResource CalmStyleDescription}" Margin="0,5,0,0"
+                                                           Foreground="{DynamicResource SecondaryText}" TextWrapping="Wrap" /></StackPanel>
+                                        </RadioButton>
+                                        <RadioButton x:Name="AggressiveStyleChoice" GroupName="VisualStyle" Tag="aggressive"
+                                                     Style="{StaticResource SettingChoice}" Checked="Appearance_Checked">
+                                            <StackPanel><TextBlock Text="{DynamicResource AggressiveStyle}" FontWeight="SemiBold" />
+                                                <TextBlock Text="{DynamicResource AggressiveStyleDescription}" Margin="0,5,0,0"
+                                                           Foreground="{DynamicResource SecondaryText}" TextWrapping="Wrap" /></StackPanel>
+                                        </RadioButton>
+                                    </UniformGrid>
+                                </StackPanel>
+                            </Border>
+                            <Border Style="{StaticResource SectionCard}">
+                                <StackPanel>
+                                    <TextBlock Text="{DynamicResource ColorTheme}" FontSize="16" FontWeight="SemiBold" />
+                                    <TextBlock Text="{DynamicResource ColorThemeDescription}" Margin="0,5,0,16"
+                                               Foreground="{DynamicResource SecondaryText}" TextWrapping="Wrap" />
+                                    <UniformGrid Columns="2">
+                                        <RadioButton x:Name="DarkThemeChoice" GroupName="ColorTheme" Tag="dark"
+                                                     Style="{StaticResource SettingChoice}" Checked="Appearance_Checked">
+                                            <StackPanel><TextBlock Text="{DynamicResource DarkTheme}" FontWeight="SemiBold" />
+                                                <TextBlock Text="{DynamicResource DarkThemeDescription}" Margin="0,5,0,0"
+                                                           Foreground="{DynamicResource SecondaryText}" TextWrapping="Wrap" /></StackPanel>
+                                        </RadioButton>
+                                        <RadioButton x:Name="LightThemeChoice" GroupName="ColorTheme" Tag="light"
+                                                     Style="{StaticResource SettingChoice}" Checked="Appearance_Checked">
+                                            <StackPanel><TextBlock Text="{DynamicResource LightTheme}" FontWeight="SemiBold" />
+                                                <TextBlock Text="{DynamicResource LightThemeDescription}" Margin="0,5,0,0"
+                                                           Foreground="{DynamicResource SecondaryText}" TextWrapping="Wrap" /></StackPanel>
+                                        </RadioButton>
+                                    </UniformGrid>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
             </TabControl>
 
-            <Border Grid.Row="2" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0">
+            <Border Grid.Row="2" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0">
                 <Grid Margin="32,0">
                     <TextBlock x:Name="LiveMetricsText" Text="{DynamicResource MonitoringIdle}" VerticalAlignment="Center"
-                               FontSize="11" Foreground="{StaticResource SecondaryText}" />
+                               FontSize="11" Foreground="{DynamicResource SecondaryText}" />
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                        <Ellipse x:Name="StatusDot" Width="6" Height="6" Margin="0,1,7,0" Fill="{StaticResource SecondaryText}" />
+                        <Ellipse x:Name="StatusDot" Width="6" Height="6" Margin="0,1,7,0" Fill="{DynamicResource SecondaryText}" />
                         <TextBlock x:Name="StatusText" Text="{DynamicResource StatusStarting}" FontSize="11"
-                                   Foreground="{StaticResource SecondaryText}" MaxWidth="420" TextTrimming="CharacterEllipsis" />
+                                   Foreground="{DynamicResource SecondaryText}" MaxWidth="420" TextTrimming="CharacterEllipsis" />
                     </StackPanel>
                 </Grid>
             </Border>

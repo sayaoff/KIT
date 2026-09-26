@@ -1,0 +1,15 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <SolidColorBrush x:Key="WindowBackground" Color="#131416" />
+    <SolidColorBrush x:Key="SidebarBackground" Color="#181A1D" />
+    <SolidColorBrush x:Key="PanelBackground" Color="#1D1F23" />
+    <SolidColorBrush x:Key="InsetBackground" Color="#111214" />
+    <SolidColorBrush x:Key="HoverBackground" Color="#302821" />
+    <SolidColorBrush x:Key="SelectedBackground" Color="#3A2B21" />
+    <SolidColorBrush x:Key="ButtonBackground" Color="#36302C" />
+    <SolidColorBrush x:Key="BorderBrush" Color="#494038" />
+    <SolidColorBrush x:Key="PrimaryText" Color="#F3F0EC" />
+    <SolidColorBrush x:Key="SecondaryText" Color="#B0A89F" />
+    <SolidColorBrush x:Key="Accent" Color="#E0793D" />
+    <CornerRadius x:Key="CardCornerRadius">2</CornerRadius>
+    <CornerRadius x:Key="ControlCornerRadius">1</CornerRadius>
+</ResourceDictionary>

@@ -119,9 +119,17 @@ static async Task PersistsLanguagePreferenceAsync()
     var directory = Path.Combine(Path.GetTempPath(), "kit-preferences-" + Guid.NewGuid().ToString("N"));
     try
     {
-        var repository = new JsonUserPreferencesRepository(new LocalDataPaths(directory));
-        await repository.SaveAsync(new UserPreferences("ru"));
-        Assert((await repository.LoadAsync()).Language == "ru", "Language preference did not round-trip.");
+        var paths = new LocalDataPaths(directory);
+        Directory.CreateDirectory(directory);
+        await File.WriteAllTextAsync(paths.PreferencesFile, "{\"language\":\"ru\"}");
+        var repository = new JsonUserPreferencesRepository(paths);
+        var migrated = await repository.LoadAsync();
+        Assert(migrated == new UserPreferences("ru", "dark", "calm"),
+            "Legacy language preference did not receive appearance defaults.");
+        await repository.SaveAsync(new UserPreferences("ru", "light", "aggressive"));
+        var saved = await repository.LoadAsync();
+        Assert(saved == new UserPreferences("ru", "light", "aggressive"),
+            "Appearance preferences did not round-trip.");
     }
     finally { if (Directory.Exists(directory)) Directory.Delete(directory, true); }
 }

@@ -17,6 +17,7 @@ public partial class App : System.Windows.Application
         var preferences = new JsonUserPreferencesRepository(paths);
         var savedPreferences = preferences.LoadAsync().GetAwaiter().GetResult();
         ApplyLanguage(savedPreferences.Language);
+        ApplyAppearance(savedPreferences.Theme, savedPreferences.VisualStyle);
         _trackingService = new GameTrackingService(
             new JsonGameConfigurationRepository(paths),
             new JsonKitRepository(paths),
@@ -29,7 +30,7 @@ public partial class App : System.Windows.Application
             new WindowsSessionActionCoordinator(),
             new SystemClock());
 
-        MainWindow = new MainWindow(_trackingService, paths, preferences, savedPreferences.Language);
+        MainWindow = new MainWindow(_trackingService, paths, preferences, savedPreferences);
         MainWindow.Show();
     }
 
@@ -44,6 +45,21 @@ public partial class App : System.Windows.Application
             Source = new Uri($"Resources/Strings.{(language == "ru" ? "ru" : "en")}.xaml", UriKind.Relative)
         };
         if (existing is null) dictionaries.Insert(0, replacement);
+        else dictionaries[dictionaries.IndexOf(existing)] = replacement;
+    }
+
+    public static void ApplyAppearance(string theme, string visualStyle)
+    {
+        var normalizedTheme = theme == "light" ? "Light" : "Dark";
+        var normalizedStyle = visualStyle == "aggressive" ? "Aggressive" : "Calm";
+        var dictionaries = Current.Resources.MergedDictionaries;
+        var existing = dictionaries.FirstOrDefault(dictionary =>
+            dictionary.Source?.OriginalString.Contains("Themes/", StringComparison.OrdinalIgnoreCase) is true);
+        var replacement = new ResourceDictionary
+        {
+            Source = new Uri($"Themes/{normalizedTheme}{normalizedStyle}.xaml", UriKind.Relative)
+        };
+        if (existing is null) dictionaries.Add(replacement);
         else dictionaries[dictionaries.IndexOf(existing)] = replacement;
     }
 

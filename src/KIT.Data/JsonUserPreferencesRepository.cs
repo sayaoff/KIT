@@ -2,7 +2,10 @@ using System.Text.Json;
 
 namespace KIT.Data;
 
-public sealed record UserPreferences(string Language);
+public sealed record UserPreferences(
+    string Language = "en",
+    string Theme = "dark",
+    string VisualStyle = "calm");
 
 public sealed class JsonUserPreferencesRepository
 {

@@ -26,18 +26,23 @@ public partial class MainWindow : Window
     private bool _reloadingCatalog;
     private bool _allowClose;
     private string _currentLanguage;
+    private string _currentTheme;
+    private string _currentVisualStyle;
+    private bool _initializingAppearance;
     private TrackingState? _previousTrackingState;
     private TrackingStatus? _lastStatus;
     private ResourceSample? _lastResourceSample;
 
     public MainWindow(GameTrackingService trackingService, LocalDataPaths dataPaths,
-        JsonUserPreferencesRepository preferencesRepository, string language)
+        JsonUserPreferencesRepository preferencesRepository, UserPreferences preferences)
     {
         InitializeComponent();
         _trackingService = trackingService;
         _dataPaths = dataPaths;
         _preferencesRepository = preferencesRepository;
-        _currentLanguage = language == "ru" ? "ru" : "en";
+        _currentLanguage = preferences.Language == "ru" ? "ru" : "en";
+        _currentTheme = preferences.Theme == "light" ? "light" : "dark";
+        _currentVisualStyle = preferences.VisualStyle == "aggressive" ? "aggressive" : "calm";
         _trackingService.StatusChanged += TrackingService_StatusChanged;
         _trackingService.ActivityRecorded += TrackingService_ActivityRecorded;
         _trackingService.CatalogChanged += TrackingService_CatalogChanged;
@@ -56,6 +61,10 @@ public partial class MainWindow : Window
         Closed += (_, _) => _trayIcon.Dispose();
 
         UpdateLanguageButton();
+        _initializingAppearance = true;
+        (_currentVisualStyle == "aggressive" ? AggressiveStyleChoice : CalmStyleChoice).IsChecked = true;
+        (_currentTheme == "light" ? LightThemeChoice : DarkThemeChoice).IsChecked = true;
+        _initializingAppearance = false;
     }
 
     private Forms.ContextMenuStrip BuildTrayMenu()
@@ -334,6 +343,7 @@ public partial class MainWindow : Window
         {
             1 => S("KitsTab"),
             2 => S("SessionsTab"),
+            3 => S("SettingsTab"),
             _ => S("HomeTab")
         };
     }
@@ -342,11 +352,12 @@ public partial class MainWindow : Window
     {
         _currentLanguage = _currentLanguage == "ru" ? "en" : "ru";
         App.ApplyLanguage(_currentLanguage);
-        await _preferencesRepository.SaveAsync(new UserPreferences(_currentLanguage));
+        await SavePreferencesAsync();
         UpdateLanguageButton();
         if (HomeNavigation.IsChecked is true) PageTitle.Text = S("HomeTab");
         else if (KitsNavigation.IsChecked is true) PageTitle.Text = S("KitsTab");
-        else PageTitle.Text = S("SessionsTab");
+        else if (SessionsNavigation.IsChecked is true) PageTitle.Text = S("SessionsTab");
+        else PageTitle.Text = S("SettingsTab");
         ShowConfiguredPath();
         ActiveKitText.Text = string.Format(S("ActiveKitFormat"), _trackingService.ActiveKit.Name);
         if (_lastStatus is not null) StatusText.Text = FormatStatus(_lastStatus);
@@ -363,6 +374,20 @@ public partial class MainWindow : Window
 
     private void UpdateLanguageButton() =>
         LanguageToggleButton.Content = _currentLanguage == "ru" ? "RU  Русский" : "EN  English";
+
+    private async void Appearance_Checked(object sender, RoutedEventArgs e)
+    {
+        if (_initializingAppearance || sender is not System.Windows.Controls.RadioButton choice) return;
+        if (choice == CalmStyleChoice || choice == AggressiveStyleChoice)
+            _currentVisualStyle = choice.Tag?.ToString() == "aggressive" ? "aggressive" : "calm";
+        else
+            _currentTheme = choice.Tag?.ToString() == "light" ? "light" : "dark";
+        App.ApplyAppearance(_currentTheme, _currentVisualStyle);
+        await SavePreferencesAsync();
+    }
+
+    private Task SavePreferencesAsync() =>
+        _preferencesRepository.SaveAsync(new UserPreferences(_currentLanguage, _currentTheme, _currentVisualStyle));
 
     private static string S(string key) =>
         System.Windows.Application.Current.TryFindResource(key) as string ?? key;
