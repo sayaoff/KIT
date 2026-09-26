@@ -5,4 +5,5 @@ obj/
 *.suo
 TestResults/
 outputs/*
+artifacts/*
 .DS_Store

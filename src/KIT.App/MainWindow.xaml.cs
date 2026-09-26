@@ -21,6 +21,7 @@ public partial class MainWindow : Window
     private readonly JsonUserPreferencesRepository _preferencesRepository;
     private readonly WindowsStartupRegistration _startupRegistration;
     private readonly Forms.NotifyIcon _trayIcon;
+    private readonly Drawing.Icon _appIcon;
     private readonly List<ApplicationTarget> _cleanApps = [];
     private readonly List<ApplicationTarget> _launchApps = [];
     private readonly List<ActivityEvent> _activity = [];
@@ -58,15 +59,20 @@ public partial class MainWindow : Window
         _trackingService.ResourceSampled += TrackingService_ResourceSampled;
         _trackingService.SessionSaved += TrackingService_SessionSaved;
         Closing += MainWindow_Closing;
+        _appIcon = LoadAppIcon();
         _trayIcon = new Forms.NotifyIcon
         {
-            Icon = Drawing.SystemIcons.Application,
+            Icon = _appIcon,
             Text = "KIT Alpha",
             Visible = true,
             ContextMenuStrip = BuildTrayMenu()
         };
         _trayIcon.DoubleClick += (_, _) => RestoreWindow();
-        Closed += (_, _) => _trayIcon.Dispose();
+        Closed += (_, _) =>
+        {
+            _trayIcon.Dispose();
+            _appIcon.Dispose();
+        };
 
         UpdateLanguageButton();
         _initializingAppearance = true;
@@ -95,6 +101,20 @@ public partial class MainWindow : Window
         menu.Items.Add(S("TrayOpen"), null, (_, _) => RestoreWindow());
         menu.Items.Add(S("TrayExit"), null, (_, _) => Dispatcher.Invoke(RequestExit));
         return menu;
+    }
+
+    private static Drawing.Icon LoadAppIcon()
+    {
+        try
+        {
+            if (Environment.ProcessPath is { } path && Drawing.Icon.ExtractAssociatedIcon(path) is { } icon)
+                return icon;
+        }
+        catch
+        {
+            // The embedded executable icon remains available to the WPF window.
+        }
+        return (Drawing.Icon)Drawing.SystemIcons.Application.Clone();
     }
 
     public void BeginInitialization()

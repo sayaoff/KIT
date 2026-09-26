@@ -1,5 +1,7 @@
 # KIT Alpha
 
+Current release candidate: **0.1.0-alpha.1 (RC1)**.
+
 KIT — Windows-first приложение, которое применяет выбранное окружение при запуске Counter-Strike 2 и возвращает систему в исходное состояние после завершения игровой сессии.
 
 > **KIT works around the game, never inside it.**
@@ -67,6 +69,16 @@ dotnet build KIT.sln
 dotnet run --project src/KIT.App/KIT.App.csproj
 dotnet run --project tests/KIT.Core.Tests/KIT.Core.Tests.csproj
 ```
+
+## Сборка Release Candidate на Windows
+
+Для portable-версии достаточно .NET 10 SDK. Для установщика дополнительно нужен Inno Setup 6.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\build-release.ps1
+```
+
+Сценарий собирает и проверяет solution, публикует self-contained `win-x64` приложение в `artifacts\publish` и, если найден Inno Setup, создаёт per-user установщик в `artifacts\installer`. Установщик не требует постоянных или установочных прав администратора и удаляет запись автозапуска при uninstall. Пользовательские данные в `%LOCALAPPDATA%\KIT` намеренно сохраняются.
 
 ## Как проверить сценарий Kit
 
