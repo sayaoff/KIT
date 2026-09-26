@@ -69,7 +69,7 @@ The Alpha is not commercially code-signed yet, so Microsoft SmartScreen may warn
 
 The immediate goal is a stable Alpha 0.1: installer validation, clean Windows testing, and bug fixes. GPU/VRAM metrics, session charts, Deck, and safe `.kit` import/export can follow.
 
-FPS tracking, injection, memory reading, game-file modification, arbitrary scripts, Workshop/plugins, cloud features, macOS, and other games are outside the Alpha 0.1 scope.
+FPS tracking, injection, memory reading, game-file modification, arbitrary scripts, Workshop/plugins, cloud features, and other games are outside the Alpha 0.1 scope.
 
 ## License
 
