@@ -2,6 +2,7 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:sys="clr-namespace:System;assembly=System.Runtime">
     <sys:String x:Key="Subtitle">Альфа · Counter-Strike 2</sys:String>
+    <sys:String x:Key="LanguageLabel">ЯЗЫК</sys:String>
     <sys:String x:Key="StatusStarting">Запуск…</sys:String>
     <sys:String x:Key="StatusNotConfigured">Выберите cs2.exe, чтобы начать отслеживание.</sys:String>
     <sys:String x:Key="StatusWatching">Ожидание запуска · активен Kit «{0}»</sys:String>

@@ -205,6 +205,7 @@ public sealed class GameTrackingService : IAsyncDisposable
         var kit = ActiveKit;
         _awaitingRecoveredProcess = false;
         _currentSession = new GameSession(Guid.NewGuid(), change.ProcessId, change.ExecutablePath, _clock.UtcNow);
+        PublishStatus(TrackingState.GameRunning, $"CS2 is running · {kit.Name} Kit", _currentSession);
         try
         {
             await _resourceMonitor.StartAsync(change.ProcessId, OnResourceSampleAsync, cancellationToken);

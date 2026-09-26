@@ -20,7 +20,9 @@ KIT не внедряется в игру, не читает её память, 
 - live CPU/RAM monitoring of the selected CS2 process using standard Windows process counters;
 - Sessions view with duration and average/peak CPU and RAM metrics;
 - tray-режим: закрытие окна скрывает KIT, выход выполняется через tray menu;
+- автоматическое скрытие окна в tray сразу после обнаружения запуска CS2;
 - переключение интерфейса между English и Русским с сохранением выбора;
+- минималистичная тёмно-серая оболочка с левой навигацией и компактной строкой состояния;
 - работа без постоянных прав администратора;
 - локальное хранение без аккаунта и облака.
 

@@ -24,8 +24,9 @@ public partial class MainWindow : Window
     private readonly List<ActivityEvent> _activity = [];
     private readonly List<SessionRecord> _sessions = [];
     private bool _reloadingCatalog;
-    private bool _changingLanguage;
     private bool _allowClose;
+    private string _currentLanguage;
+    private TrackingState? _previousTrackingState;
     private TrackingStatus? _lastStatus;
     private ResourceSample? _lastResourceSample;
 
@@ -36,6 +37,7 @@ public partial class MainWindow : Window
         _trackingService = trackingService;
         _dataPaths = dataPaths;
         _preferencesRepository = preferencesRepository;
+        _currentLanguage = language == "ru" ? "ru" : "en";
         _trackingService.StatusChanged += TrackingService_StatusChanged;
         _trackingService.ActivityRecorded += TrackingService_ActivityRecorded;
         _trackingService.CatalogChanged += TrackingService_CatalogChanged;
@@ -53,11 +55,7 @@ public partial class MainWindow : Window
         _trayIcon.DoubleClick += (_, _) => RestoreWindow();
         Closed += (_, _) => _trayIcon.Dispose();
 
-        _changingLanguage = true;
-        LanguageSelector.ItemsSource = new[] { new LanguageOption("en", "English"), new LanguageOption("ru", "Русский") };
-        LanguageSelector.SelectedItem = ((IEnumerable<LanguageOption>)LanguageSelector.ItemsSource)
-            .First(option => option.Code == (language == "ru" ? "ru" : "en"));
-        _changingLanguage = false;
+        UpdateLanguageButton();
     }
 
     private Forms.ContextMenuStrip BuildTrayMenu()
@@ -238,13 +236,16 @@ public partial class MainWindow : Window
 
     private void TrackingService_StatusChanged(object? sender, TrackingStatus status) => Dispatcher.Invoke(() =>
     {
+        var minimizeToTray = status.State is TrackingState.GameRunning &&
+                             _previousTrackingState is not TrackingState.GameRunning;
+        _previousTrackingState = status.State;
         _lastStatus = status;
         StatusText.Text = FormatStatus(status);
         StatusDot.Fill = status.State switch
         {
-            TrackingState.GameRunning => new SolidColorBrush(WpfColor.FromRgb(112, 224, 163)),
-            TrackingState.Watching => new SolidColorBrush(WpfColor.FromRgb(111, 174, 255)),
-            _ => new SolidColorBrush(WpfColor.FromRgb(169, 179, 191))
+            TrackingState.GameRunning => new SolidColorBrush(WpfColor.FromRgb(126, 168, 141)),
+            TrackingState.Watching => new SolidColorBrush(WpfColor.FromRgb(126, 145, 168)),
+            _ => new SolidColorBrush(WpfColor.FromRgb(140, 144, 151))
         };
         if (KitSelector.SelectedItem is KitDefinition selected) LoadKitEditor(selected);
         if (status.State is not TrackingState.GameRunning)
@@ -252,6 +253,7 @@ public partial class MainWindow : Window
             _lastResourceSample = null;
             LiveMetricsText.Text = S("MonitoringIdle");
         }
+        if (minimizeToTray && IsVisible) HideToTray();
     });
 
     private void TrackingService_ActivityRecorded(object? sender, ActivityEvent activity) => Dispatcher.Invoke(() =>
@@ -320,12 +322,28 @@ public partial class MainWindow : Window
         _ => status.Message
     };
 
-    private async void LanguageSelector_SelectionChanged(object sender,
-        System.Windows.Controls.SelectionChangedEventArgs e)
+    private void Navigation_Checked(object sender, RoutedEventArgs e)
     {
-        if (_changingLanguage || LanguageSelector.SelectedItem is not LanguageOption selected) return;
-        App.ApplyLanguage(selected.Code);
-        await _preferencesRepository.SaveAsync(new UserPreferences(selected.Code));
+        if (MainTabs is null || PageTitle is null || sender is not System.Windows.Controls.RadioButton item) return;
+        if (!int.TryParse(item.Tag?.ToString(), out var index)) return;
+        MainTabs.SelectedIndex = index;
+        PageTitle.Text = index switch
+        {
+            1 => S("KitsTab"),
+            2 => S("SessionsTab"),
+            _ => S("HomeTab")
+        };
+    }
+
+    private async void LanguageToggle_Click(object sender, RoutedEventArgs e)
+    {
+        _currentLanguage = _currentLanguage == "ru" ? "en" : "ru";
+        App.ApplyLanguage(_currentLanguage);
+        await _preferencesRepository.SaveAsync(new UserPreferences(_currentLanguage));
+        UpdateLanguageButton();
+        if (HomeNavigation.IsChecked is true) PageTitle.Text = S("HomeTab");
+        else if (KitsNavigation.IsChecked is true) PageTitle.Text = S("KitsTab");
+        else PageTitle.Text = S("SessionsTab");
         ShowConfiguredPath();
         ActiveKitText.Text = string.Format(S("ActiveKitFormat"), _trackingService.ActiveKit.Name);
         if (_lastStatus is not null) StatusText.Text = FormatStatus(_lastStatus);
@@ -339,6 +357,9 @@ public partial class MainWindow : Window
         _trayIcon.ContextMenuStrip = BuildTrayMenu();
         oldMenu?.Dispose();
     }
+
+    private void UpdateLanguageButton() =>
+        LanguageToggleButton.Content = _currentLanguage == "ru" ? "RU  Русский" : "EN  English";
 
     private static string S(string key) =>
         System.Windows.Application.Current.TryFindResource(key) as string ?? key;
@@ -357,6 +378,11 @@ public partial class MainWindow : Window
     {
         if (_allowClose) return;
         e.Cancel = true;
+        HideToTray();
+    }
+
+    private void HideToTray()
+    {
         Hide();
         ShowInTaskbar = false;
     }
@@ -379,7 +405,6 @@ public partial class MainWindow : Window
         System.Windows.Application.Current.Shutdown();
     }
 
-    private sealed record LanguageOption(string Code, string Name);
     private sealed record SessionRow(string Date, string Kit, string Duration,
         string AverageCpu, string PeakCpu, string AverageRam, string PeakRam);
 }

@@ -6,11 +6,61 @@
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="Resources/Strings.en.xaml" />
             </ResourceDictionary.MergedDictionaries>
-        <SolidColorBrush x:Key="WindowBackground" Color="#101318" />
-        <SolidColorBrush x:Key="PanelBackground" Color="#191E25" />
-        <SolidColorBrush x:Key="PrimaryText" Color="#F4F7FA" />
-        <SolidColorBrush x:Key="SecondaryText" Color="#A9B3BF" />
-        <SolidColorBrush x:Key="Accent" Color="#70E0A3" />
+        <SolidColorBrush x:Key="WindowBackground" Color="#1B1D21" />
+        <SolidColorBrush x:Key="SidebarBackground" Color="#202328" />
+        <SolidColorBrush x:Key="PanelBackground" Color="#24272C" />
+        <SolidColorBrush x:Key="InsetBackground" Color="#1E2024" />
+        <SolidColorBrush x:Key="HoverBackground" Color="#2A2E34" />
+        <SolidColorBrush x:Key="SelectedBackground" Color="#30343A" />
+        <SolidColorBrush x:Key="BorderBrush" Color="#363A41" />
+        <SolidColorBrush x:Key="PrimaryText" Color="#ECEDEF" />
+        <SolidColorBrush x:Key="SecondaryText" Color="#999EA6" />
+        <SolidColorBrush x:Key="Accent" Color="#C2C7CE" />
+
+        <Style TargetType="Button">
+            <Setter Property="Background" Value="{StaticResource SelectedBackground}" />
+            <Setter Property="Foreground" Value="{StaticResource PrimaryText}" />
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Root" Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="5" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Root" Property="Background" Value="{StaticResource HoverBackground}" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.45" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style TargetType="TextBox">
+            <Setter Property="Background" Value="{StaticResource InsetBackground}" />
+            <Setter Property="Foreground" Value="{StaticResource PrimaryText}" />
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+            <Setter Property="CaretBrush" Value="{StaticResource PrimaryText}" />
+        </Style>
+        <Style TargetType="ComboBox">
+            <Setter Property="Background" Value="{StaticResource InsetBackground}" />
+            <Setter Property="Foreground" Value="{StaticResource PrimaryText}" />
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+        </Style>
+        <Style TargetType="DataGridColumnHeader">
+            <Setter Property="Background" Value="{StaticResource SelectedBackground}" />
+            <Setter Property="Foreground" Value="{StaticResource SecondaryText}" />
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+            <Setter Property="Padding" Value="10,8" />
+        </Style>
         </ResourceDictionary>
     </Application.Resources>
 </Application>
