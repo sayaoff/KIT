@@ -41,7 +41,7 @@ Gaming often means closing background applications, starting the tools you need,
 
 KIT works **around the game**, never inside it. It does not inject code, hook or read process memory, modify CS2 files, automate game input, interact with anti-cheat software, send telemetry, or require permanent administrator privileges.
 
-The source is public for inspection and independent builds. See [Trust and transparency](docs/TRANSPARENCY.md) for every system-level action and [SECURITY.md](SECURITY.md) for vulnerability reporting.
+The source is public for inspection. See [Trust and transparency](docs/TRANSPARENCY.md) for every system-level action. Separate [build instructions](docs/BUILDING.md) and a [security policy](SECURITY.md) are available for technical review.
 
 ## Install
 
@@ -64,26 +64,6 @@ The Alpha is not commercially code-signed yet, so Microsoft SmartScreen may warn
 
 > [!WARNING]
 > Clean Mode first requests a normal application exit, waits two seconds, and then terminates a remaining background process. This is required for tray applications such as Telegram, but unsaved work may be lost. Add only applications you explicitly allow KIT to close.
-
-## Build from source
-
-Windows 10/11 and the .NET 10 SDK are required.
-
-```powershell
-git clone https://github.com/sayaoff/KIT.git
-cd KIT
-dotnet build KIT.sln
-dotnet run --project tests\KIT.Core.Tests\KIT.Core.Tests.csproj
-dotnet run --project src\KIT.App\KIT.App.csproj
-```
-
-For a complete release build, run:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts\build-release.ps1
-```
-
-The script produces a self-contained `win-x64` portable build and SHA-256 value. When Inno Setup 6 is installed, it also produces a per-user installer that does not request administrator privileges.
 
 ## Roadmap
 

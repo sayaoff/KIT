@@ -50,7 +50,7 @@ KIT работает **вокруг игры**, а не внутри неё:
 - не отправляет телеметрию и не использует сеть;
 - не требует постоянных прав администратора.
 
-Исходный код опубликован для проверки и самостоятельной сборки. Полный перечень системных действий и инструкция проверки релиза находятся в [документе о прозрачности](docs/TRANSPARENCY.md). Информацию о безопасном сообщении об уязвимостях см. в [SECURITY.md](SECURITY.md).
+Исходный код опубликован для проверки. Полный перечень системных действий находится в [документе о прозрачности](docs/TRANSPARENCY.md). Для технической проверки доступны отдельные [инструкции сборки](docs/BUILDING.md) и [политика безопасности](SECURITY.md).
 
 ## Установка
 
@@ -73,49 +73,6 @@ Alpha пока не подписана коммерческим сертифик
 
 > [!WARNING]
 > Clean Mode сначала запрашивает штатное закрытие приложения, ждёт две секунды, а затем завершает оставшийся фоновый процесс. Это нужно для tray-приложений вроде Telegram, но несохранённые данные могут быть потеряны. Добавляйте только те программы, которые действительно разрешаете закрывать.
-
-## Сборка из исходников
-
-Требуются Windows 10/11 и .NET 10 SDK.
-
-```powershell
-git clone https://github.com/sayaoff/KIT.git
-cd KIT
-dotnet build KIT.sln
-dotnet run --project tests\KIT.Core.Tests\KIT.Core.Tests.csproj
-dotnet run --project src\KIT.App\KIT.App.csproj
-```
-
-Полная release-сборка:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts\build-release.ps1
-```
-
-Сценарий создаёт self-contained `win-x64` portable-сборку и SHA-256. Если установлен Inno Setup 6, дополнительно создаётся per-user установщик без запроса администраторских прав.
-
-<details>
-<summary><strong>Архитектура и локальные данные</strong></summary>
-
-### Проекты
-
-- `KIT.Core` — Kits, жизненный цикл сессии, Actions/Restore и recovery.
-- `KIT.Infrastructure.Windows` — наблюдение за процессами и Windows-действия.
-- `KIT.Data` — локальное хранение JSON/JSONL.
-- `KIT.App` — WPF-интерфейс и системный трей.
-- `KIT.Core.Tests` — автономные проверки основных сценариев.
-
-### `%LOCALAPPDATA%\KIT`
-
-- `configuration.json` — выбранный `cs2.exe`;
-- `kits.json` — Kits и Active Kit;
-- `active-session.json` — состояние аварийного восстановления;
-- `preferences.json` — язык, оформление и автозапуск;
-- `activity.jsonl` — события и предупреждения;
-- `sessions.jsonl` — завершённые сессии и CPU/RAM;
-- `startup.log` — диагностика запуска окна.
-
-</details>
 
 ## Дальше
 
