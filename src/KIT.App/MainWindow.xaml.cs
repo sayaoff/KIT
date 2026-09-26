@@ -238,6 +238,8 @@ public partial class MainWindow : Window
     {
         var minimizeToTray = status.State is TrackingState.GameRunning &&
                              _previousTrackingState is not TrackingState.GameRunning;
+        var restoreFromTray = status.State is TrackingState.Watching &&
+                              _previousTrackingState is TrackingState.GameRunning;
         _previousTrackingState = status.State;
         _lastStatus = status;
         StatusText.Text = FormatStatus(status);
@@ -254,6 +256,7 @@ public partial class MainWindow : Window
             LiveMetricsText.Text = S("MonitoringIdle");
         }
         if (minimizeToTray && IsVisible) HideToTray();
+        else if (restoreFromTray) RestoreWindow();
     });
 
     private void TrackingService_ActivityRecorded(object? sender, ActivityEvent activity) => Dispatcher.Invoke(() =>

@@ -103,7 +103,7 @@
                        Text="{DynamicResource HomeTab}" />
 
             <TabControl x:Name="MainTabs" Grid.Row="1" Style="{StaticResource HiddenTabs}"
-                        Background="Transparent" BorderThickness="0">
+                        Background="Transparent" Foreground="{StaticResource PrimaryText}" BorderThickness="0">
                 <TabItem>
                     <Grid Margin="32,0,32,24">
                         <Grid.RowDefinitions>
