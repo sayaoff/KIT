@@ -46,9 +46,11 @@ The source is public for inspection and independent builds. See [Trust and trans
 ## Install
 
 1. Open [Releases](https://github.com/sayaoff/KIT/releases/latest).
-2. Download `KIT-Alpha-0.1.0-RC1-Setup-x64.exe` or the portable ZIP.
-3. For the portable build, fully extract the archive and run `KIT.exe`.
+2. Download `KIT-Alpha-0.1-RC1-win-x64.zip`.
+3. Fully extract the archive and run `KIT.exe`.
 4. Select the installed Counter-Strike 2 `cs2.exe` from Home.
+
+The installer definition is already included in the source and will be attached to the Release after a separate clean-Windows validation.
 
 The Alpha is not commercially code-signed yet, so Microsoft SmartScreen may warn about a new binary. Verify the repository address and the SHA-256 value published with the release, or build KIT from source.
 
