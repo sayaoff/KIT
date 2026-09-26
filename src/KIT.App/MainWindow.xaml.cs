@@ -237,7 +237,7 @@ public partial class MainWindow : Window
                                    ?? _trackingService.ActiveKit;
         _reloadingCatalog = false;
         if (KitSelector.SelectedItem is KitDefinition selected) LoadKitEditor(selected);
-        ActiveKitText.Text = string.Format(S("ActiveKitFormat"), _trackingService.ActiveKit.Name);
+        RenderDashboard();
     }
 
     private void TrackingService_CatalogChanged(object? sender, KitCatalog catalog) =>
@@ -252,6 +252,7 @@ public partial class MainWindow : Window
         _previousTrackingState = status.State;
         _lastStatus = status;
         StatusText.Text = FormatStatus(status);
+        HomeGameStateText.Text = FormatStatus(status);
         StatusDot.Fill = status.State switch
         {
             TrackingState.GameRunning => new SolidColorBrush(WpfColor.FromRgb(126, 168, 141)),
@@ -287,24 +288,17 @@ public partial class MainWindow : Window
         RenderSessions();
     });
 
-    private string FormatActivity(ActivityEvent activity)
-    {
-        var duration = activity.Duration is null ? "" : $" · {activity.Duration.Value:g}";
-        var kit = activity.KitName is null ? "" : $" · {activity.KitName}";
-        var details = activity.Details is null ? "" : $" · {activity.Details}";
-        var eventName = S("Activity" + activity.Kind);
-        return $"{activity.OccurredAtUtc.ToLocalTime():yyyy-MM-dd HH:mm:ss}  {eventName}{kit}{duration}{details}";
-    }
-
     private void ShowConfiguredPath() =>
         ExecutablePathText.Text = _trackingService.Configuration?.ExecutablePath ?? S("NoExecutable");
 
     private void RenderActivity()
     {
-        ActivityText.Text = _activity.Count == 0
-            ? S("NoActivity")
-            : string.Join(Environment.NewLine, _activity.Select(FormatActivity));
-        ActivityText.ScrollToEnd();
+        RecentActivityList.ItemsSource = _activity.Count == 0
+            ? [new ActivityRow(S("NoActivity"), "", "")]
+            : _activity.TakeLast(5).Reverse().Select(activity => new ActivityRow(
+                S("Activity" + activity.Kind),
+                FormatActivityDetail(activity),
+                activity.OccurredAtUtc.ToLocalTime().ToString("HH:mm"))).ToList();
     }
 
     private void RenderSessions()
@@ -320,6 +314,53 @@ public partial class MainWindow : Window
                 session.Metrics.SampleCount == 0 ? "—" : $"{session.Metrics.AverageWorkingSetBytes / 1024d / 1024d:F0} {S("MegabytesUnit")}",
                 session.Metrics.SampleCount == 0 ? "—" : $"{session.Metrics.PeakWorkingSetBytes / 1024d / 1024d:F0} {S("MegabytesUnit")}"))
             .ToList();
+        RenderDashboard();
+    }
+
+    private void RenderDashboard()
+    {
+        var kit = _trackingService.ActiveKit;
+        HomeActiveKitNameText.Text = kit.Name;
+        HomeKitSummaryText.Text = string.Format(S("KitActionsSummary"),
+            kit.CleanModeApps.Count, kit.LaunchApps.Count);
+        HomeGameStateText.Text = _lastStatus is null ? S("StatusStarting") : FormatStatus(_lastStatus);
+
+        var last = _sessions.OrderByDescending(session => session.EndedAtUtc).FirstOrDefault();
+        if (last is null)
+        {
+            LastSessionDurationText.Text = "—";
+            LastSessionDateText.Text = S("NoSessionsYet");
+            DashboardCpuText.Text = "—";
+            DashboardCpuPeakText.Text = "";
+            DashboardRamText.Text = "—";
+            DashboardRamPeakText.Text = "";
+            return;
+        }
+
+        LastSessionDurationText.Text = FormatDuration(last.Duration);
+        LastSessionDateText.Text = last.StartedAtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
+        if (last.Metrics.SampleCount == 0)
+        {
+            DashboardCpuText.Text = "—";
+            DashboardCpuPeakText.Text = "";
+            DashboardRamText.Text = "—";
+            DashboardRamPeakText.Text = "";
+            return;
+        }
+
+        DashboardCpuText.Text = $"{last.Metrics.AverageCpuPercent:F1}%";
+        DashboardCpuPeakText.Text = string.Format(S("PeakValueFormat"), $"{last.Metrics.PeakCpuPercent:F1}%");
+        DashboardRamText.Text = $"{last.Metrics.AverageWorkingSetBytes / 1024d / 1024d:F0} {S("MegabytesUnit")}";
+        DashboardRamPeakText.Text = string.Format(S("PeakValueFormat"),
+            $"{last.Metrics.PeakWorkingSetBytes / 1024d / 1024d:F0} {S("MegabytesUnit")}");
+    }
+
+    private string FormatActivityDetail(ActivityEvent activity)
+    {
+        if (activity.Kind is ActivityEventKind.ActionWarning && !string.IsNullOrWhiteSpace(activity.Details))
+            return activity.Details;
+        var kit = activity.KitName ?? _trackingService.ActiveKit.Name;
+        return activity.Duration is null ? kit : $"{kit} · {FormatDuration(activity.Duration.Value)}";
     }
 
     private static string FormatDuration(TimeSpan duration) =>
@@ -359,10 +400,10 @@ public partial class MainWindow : Window
         else if (SessionsNavigation.IsChecked is true) PageTitle.Text = S("SessionsTab");
         else PageTitle.Text = S("SettingsTab");
         ShowConfiguredPath();
-        ActiveKitText.Text = string.Format(S("ActiveKitFormat"), _trackingService.ActiveKit.Name);
         if (_lastStatus is not null) StatusText.Text = FormatStatus(_lastStatus);
         RenderActivity();
         RenderSessions();
+        RenderDashboard();
         LiveMetricsText.Text = _lastResourceSample is null
             ? S("MonitoringIdle")
             : string.Format(S("LiveMetricsFormat"), _lastResourceSample.CpuPercent,
@@ -388,6 +429,14 @@ public partial class MainWindow : Window
 
     private Task SavePreferencesAsync() =>
         _preferencesRepository.SaveAsync(new UserPreferences(_currentLanguage, _currentTheme, _currentVisualStyle));
+
+    private void EditActiveKit_Click(object sender, RoutedEventArgs e)
+    {
+        KitsNavigation.IsChecked = true;
+        ReloadCatalog(_trackingService.ActiveKit.Id);
+    }
+
+    private void ViewSessions_Click(object sender, RoutedEventArgs e) => SessionsNavigation.IsChecked = true;
 
     private static string S(string key) =>
         System.Windows.Application.Current.TryFindResource(key) as string ?? key;
@@ -435,4 +484,5 @@ public partial class MainWindow : Window
 
     private sealed record SessionRow(string Date, string Kit, string Duration,
         string AverageCpu, string PeakCpu, string AverageRam, string PeakRam);
+    private sealed record ActivityRow(string Title, string Detail, string Time);
 }
