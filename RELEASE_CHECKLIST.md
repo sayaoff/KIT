@@ -20,4 +20,5 @@
 - Confirm the installer version and SHA-256 checksum.
 - Scan the installer with Microsoft Defender.
 - Add screenshots, known limitations, and the changelog to the GitHub release.
-- Decide and add the repository license before making the source repository public.
+- Confirm the PolyForm Shield required notice names the intended legal copyright holder before making the repository public.
+- Enable GitHub private vulnerability reporting.
