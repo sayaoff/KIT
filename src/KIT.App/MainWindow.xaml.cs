@@ -29,6 +29,7 @@ public partial class MainWindow : Window
     private string _currentTheme;
     private string _currentVisualStyle;
     private bool _initializingAppearance;
+    private bool _startupComplete;
     private TrackingState? _previousTrackingState;
     private TrackingStatus? _lastStatus;
     private ResourceSample? _lastResourceSample;
@@ -65,6 +66,15 @@ public partial class MainWindow : Window
         (_currentVisualStyle == "aggressive" ? AggressiveStyleChoice : CalmStyleChoice).IsChecked = true;
         (_currentTheme == "light" ? LightThemeChoice : DarkThemeChoice).IsChecked = true;
         _initializingAppearance = false;
+
+        // Checked fires while InitializeComponent is still constructing the visual tree,
+        // so select and render Home explicitly before the first frame is shown.
+        MainTabs.SelectedIndex = 0;
+        PageTitle.Text = S("HomeTab");
+        ShowConfiguredPath();
+        ReloadCatalog(_trackingService.Catalog.ActiveKitId);
+        RenderActivity();
+        RenderSessions();
     }
 
     private Forms.ContextMenuStrip BuildTrayMenu()
@@ -88,6 +98,7 @@ public partial class MainWindow : Window
             RenderSessions();
         }
         catch (Exception exception) { ShowError(S("ErrorStart"), exception); }
+        finally { _startupComplete = true; }
     }
 
     private async void SelectExecutable_Click(object sender, RoutedEventArgs e)
@@ -245,7 +256,7 @@ public partial class MainWindow : Window
 
     private void TrackingService_StatusChanged(object? sender, TrackingStatus status) => Dispatcher.Invoke(() =>
     {
-        var minimizeToTray = status.State is TrackingState.GameRunning &&
+        var minimizeToTray = _startupComplete && status.State is TrackingState.GameRunning &&
                              _previousTrackingState is not TrackingState.GameRunning;
         var restoreFromTray = status.State is TrackingState.Watching &&
                               _previousTrackingState is TrackingState.GameRunning;
@@ -474,6 +485,8 @@ public partial class MainWindow : Window
             Activate();
         });
     }
+
+    public void RestoreFromExternalLaunch() => RestoreWindow();
 
     private void RequestExit()
     {
