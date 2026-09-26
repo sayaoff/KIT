@@ -9,13 +9,16 @@ public sealed class GameTrackingService : IAsyncDisposable
     private readonly IKitRepository _kitRepository;
     private readonly IRecoveryStateRepository _recoveryRepository;
     private readonly IActivityLog _activityLog;
+    private readonly ISessionRepository _sessionRepository;
     private readonly IGameProcessWatcher _processWatcher;
+    private readonly IProcessResourceMonitor _resourceMonitor;
     private readonly IGameProcessInspector _processInspector;
     private readonly ISessionActionCoordinator _actionCoordinator;
     private readonly IClock _clock;
     private readonly SemaphoreSlim _gate = new(1, 1);
     private GameSession? _currentSession;
     private AppliedKitState? _appliedKit;
+    private bool _awaitingRecoveredProcess;
     private bool _started;
 
     public GameTrackingService(
@@ -23,7 +26,9 @@ public sealed class GameTrackingService : IAsyncDisposable
         IKitRepository kitRepository,
         IRecoveryStateRepository recoveryRepository,
         IActivityLog activityLog,
+        ISessionRepository sessionRepository,
         IGameProcessWatcher processWatcher,
+        IProcessResourceMonitor resourceMonitor,
         IGameProcessInspector processInspector,
         ISessionActionCoordinator actionCoordinator,
         IClock clock)
@@ -32,7 +37,9 @@ public sealed class GameTrackingService : IAsyncDisposable
         _kitRepository = kitRepository;
         _recoveryRepository = recoveryRepository;
         _activityLog = activityLog;
+        _sessionRepository = sessionRepository;
         _processWatcher = processWatcher;
+        _resourceMonitor = resourceMonitor;
         _processInspector = processInspector;
         _actionCoordinator = actionCoordinator;
         _clock = clock;
@@ -41,6 +48,8 @@ public sealed class GameTrackingService : IAsyncDisposable
     public event EventHandler<TrackingStatus>? StatusChanged;
     public event EventHandler<ActivityEvent>? ActivityRecorded;
     public event EventHandler<KitCatalog>? CatalogChanged;
+    public event EventHandler<ResourceSample>? ResourceSampled;
+    public event EventHandler<SessionRecord>? SessionSaved;
 
     public GameConfiguration? Configuration { get; private set; }
     public KitCatalog Catalog { get; private set; } = KitCatalog.CreateDefault();
@@ -151,12 +160,18 @@ public sealed class GameTrackingService : IAsyncDisposable
         CancellationToken cancellationToken = default) =>
         _activityLog.ReadRecentAsync(maximumCount, cancellationToken);
 
+    public Task<IReadOnlyList<SessionRecord>> ReadRecentSessionsAsync(int maximumCount = 100,
+        CancellationToken cancellationToken = default) =>
+        _sessionRepository.ReadRecentAsync(maximumCount, cancellationToken);
+
     public async Task StopAsync(CancellationToken cancellationToken = default)
     {
         if (!_started) return;
         await _processWatcher.StopAsync(cancellationToken);
+        await _resourceMonitor.StopAsync(cancellationToken);
         _currentSession = null;
         _appliedKit = null;
+        _awaitingRecoveredProcess = false;
         _started = false;
         PublishStatus(TrackingState.Stopped, "Monitoring stopped.");
     }
@@ -174,8 +189,11 @@ public sealed class GameTrackingService : IAsyncDisposable
         await _gate.WaitAsync(cancellationToken);
         try
         {
-            if (change.Kind is GameProcessChangeKind.Started && _currentSession is null)
-                await BeginSessionAsync(change, cancellationToken);
+            if (change.Kind is GameProcessChangeKind.Started)
+            {
+                if (_currentSession is null) await BeginSessionAsync(change, cancellationToken);
+                else if (_awaitingRecoveredProcess) await ResumeRecoveredSessionAsync(change, cancellationToken);
+            }
             else if (change.Kind is GameProcessChangeKind.Stopped && _currentSession?.ProcessId == change.ProcessId)
                 await EndSessionAsync(change, cancellationToken);
         }
@@ -185,7 +203,17 @@ public sealed class GameTrackingService : IAsyncDisposable
     private async Task BeginSessionAsync(GameProcessChange change, CancellationToken cancellationToken)
     {
         var kit = ActiveKit;
+        _awaitingRecoveredProcess = false;
         _currentSession = new GameSession(Guid.NewGuid(), change.ProcessId, change.ExecutablePath, _clock.UtcNow);
+        try
+        {
+            await _resourceMonitor.StartAsync(change.ProcessId, OnResourceSampleAsync, cancellationToken);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            await RecordWarningsAsync(["Resource monitoring could not start: " + exception.Message],
+                _currentSession, kit, cancellationToken);
+        }
         await RecordAsync(new ActivityEvent(Guid.NewGuid(), _currentSession.Id, ActivityEventKind.SessionStarted,
             _currentSession.StartedAtUtc, change.ProcessId, change.ExecutablePath,
             KitId: kit.Id, KitName: kit.Name), cancellationToken);
@@ -210,10 +238,39 @@ public sealed class GameTrackingService : IAsyncDisposable
         PublishStatus(TrackingState.GameRunning, $"CS2 is running · {kit.Name} Kit", _currentSession);
     }
 
+    private async Task ResumeRecoveredSessionAsync(GameProcessChange change, CancellationToken cancellationToken)
+    {
+        _awaitingRecoveredProcess = false;
+        var session = _currentSession! with { ProcessId = change.ProcessId, ExecutablePath = change.ExecutablePath };
+        _currentSession = session;
+        if (_appliedKit is not null)
+            await _recoveryRepository.SaveAsync(new SessionRecoveryState(session, _appliedKit), cancellationToken);
+        try
+        {
+            await _resourceMonitor.StartAsync(change.ProcessId, OnResourceSampleAsync, cancellationToken);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            await RecordWarningsAsync(["Resource monitoring could not resume: " + exception.Message], session,
+                new KitDefinition(_appliedKit?.KitId ?? ActiveKit.Id, _appliedKit?.KitName ?? ActiveKit.Name,
+                    false, [], []), cancellationToken);
+        }
+        PublishStatus(TrackingState.GameRunning,
+            $"CS2 is running · {_appliedKit?.KitName ?? ActiveKit.Name} Kit", session);
+    }
+
     private async Task EndSessionAsync(GameProcessChange change, CancellationToken cancellationToken)
     {
         var session = _currentSession!;
         var kit = Catalog.Kits.FirstOrDefault(candidate => candidate.Id == _appliedKit?.KitId) ?? ActiveKit;
+        SessionMetrics metrics;
+        try { metrics = await _resourceMonitor.StopAsync(cancellationToken); }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            metrics = SessionMetrics.Empty;
+            await RecordWarningsAsync(["Resource monitoring could not finish: " + exception.Message],
+                session, kit, cancellationToken);
+        }
         if (_appliedKit is not null)
         {
             try
@@ -233,8 +290,13 @@ public sealed class GameTrackingService : IAsyncDisposable
         var endedAt = _clock.UtcNow;
         await RecordAsync(new ActivityEvent(Guid.NewGuid(), session.Id, ActivityEventKind.SessionEnded,
             endedAt, change.ProcessId, change.ExecutablePath, endedAt - session.StartedAtUtc, kit.Id, kit.Name), cancellationToken);
+        var record = new SessionRecord(session.Id, kit.Id, kit.Name, session.StartedAtUtc, endedAt,
+            endedAt - session.StartedAtUtc, metrics);
+        await _sessionRepository.AppendAsync(record, cancellationToken);
+        SessionSaved?.Invoke(this, record);
         _currentSession = null;
         _appliedKit = null;
+        _awaitingRecoveredProcess = false;
         PublishStatus(TrackingState.Watching, $"Session ended · {ActiveKit.Name} Kit active");
     }
 
@@ -246,6 +308,7 @@ public sealed class GameTrackingService : IAsyncDisposable
         {
             _currentSession = recovery.Session;
             _appliedKit = recovery.AppliedKit;
+            _awaitingRecoveredProcess = true;
             return;
         }
 
@@ -258,6 +321,11 @@ public sealed class GameTrackingService : IAsyncDisposable
             "Recovered state after KIT was interrupted."), cancellationToken);
         await RecordWarningsAsync(result.Warnings, recovery.Session,
             new KitDefinition(recovery.AppliedKit.KitId, recovery.AppliedKit.KitName, false, [], []), cancellationToken);
+        var record = new SessionRecord(recovery.Session.Id, recovery.AppliedKit.KitId,
+            recovery.AppliedKit.KitName, recovery.Session.StartedAtUtc, endedAt,
+            endedAt - recovery.Session.StartedAtUtc, SessionMetrics.Empty, true);
+        await _sessionRepository.AppendAsync(record, cancellationToken);
+        SessionSaved?.Invoke(this, record);
     }
 
     private async Task RecordWarningsAsync(IReadOnlyList<string> warnings, GameSession session,
@@ -273,6 +341,12 @@ public sealed class GameTrackingService : IAsyncDisposable
     {
         await _activityLog.AppendAsync(activity, cancellationToken);
         ActivityRecorded?.Invoke(this, activity);
+    }
+
+    private ValueTask OnResourceSampleAsync(ResourceSample sample, CancellationToken cancellationToken)
+    {
+        ResourceSampled?.Invoke(this, sample);
+        return ValueTask.CompletedTask;
     }
 
     private async Task SaveCatalogAsync(CancellationToken cancellationToken)
@@ -323,6 +397,7 @@ public sealed class GameTrackingService : IAsyncDisposable
     {
         await StopAsync();
         await _processWatcher.DisposeAsync();
+        await _resourceMonitor.DisposeAsync();
         _gate.Dispose();
     }
 }

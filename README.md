@@ -17,6 +17,8 @@ KIT не внедряется в игру, не читает её память, 
 - **Restore**: приложения из Clean Mode открываются снова, а запущенные самим KIT приложения получают обычный запрос на закрытие;
 - сохранение recovery state и повторный Restore после аварийного завершения KIT;
 - persistent session/activity history;
+- live CPU/RAM monitoring of the selected CS2 process using standard Windows process counters;
+- Sessions view with duration and average/peak CPU and RAM metrics;
 - tray-режим: закрытие окна скрывает KIT, выход выполняется через tray menu;
 - переключение интерфейса между English и Русским с сохранением выбора;
 - работа без постоянных прав администратора;
@@ -33,6 +35,7 @@ KIT не внедряется в игру, не читает её память, 
 - `active-session.json` — состояние для аварийного Restore; удаляется после успешного отката;
 - `preferences.json` — выбранный язык интерфейса;
 - `activity.jsonl` — append-only журнал событий и предупреждений.
+- `sessions.jsonl` — завершённые сессии и агрегированные CPU/RAM-метрики.
 
 ## Архитектура
 
@@ -68,6 +71,6 @@ dotnet run --project tests/KIT.Core.Tests/KIT.Core.Tests.csproj
 
 ## Пока не входит
 
-Сбор метрик CPU/RAM/GPU/VRAM, температуры, полноценная аналитика Sessions, Deck, import/export `.kit`, установщик, подпись и автообновление.
+GPU/VRAM и температуры, графики и расширенная аналитика Sessions, Deck, import/export `.kit`, установщик, подпись и автообновление.
 
 Принципиально не входят: FPS, injection, memory reading, изменение файлов игры, arbitrary scripts, Workshop/plugins/cloud, macOS и другие игры.

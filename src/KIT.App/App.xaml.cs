@@ -22,7 +22,9 @@ public partial class App : System.Windows.Application
             new JsonKitRepository(paths),
             new JsonRecoveryStateRepository(paths),
             new JsonLinesActivityLog(paths),
+            new JsonLinesSessionRepository(paths),
             new PollingGameProcessWatcher(),
+            new WindowsProcessResourceMonitor(),
             new WindowsGameProcessInspector(),
             new WindowsSessionActionCoordinator(),
             new SystemClock());

@@ -11,7 +11,8 @@ var tests = new (string Name, Func<Task> Run)[]
     ("recovers actions after an interrupted session", RecoversInterruptedSessionAsync),
     ("rejects a non-CS2 executable", RejectsNonCs2ExecutableAsync),
     ("persists configuration as JSON", PersistsConfigurationAsync),
-    ("persists language preference", PersistsLanguagePreferenceAsync)
+    ("persists language preference", PersistsLanguagePreferenceAsync),
+    ("persists completed sessions", PersistsSessionsAsync)
 };
 var failures = new List<string>();
 foreach (var test in tests)
@@ -53,6 +54,8 @@ static async Task RecordsSessionAsync()
     await context.Watcher.EmitAsync(new GameProcessChange(GameProcessChangeKind.Stopped, 42, path));
 
     Assert(context.Actions.ApplyCount == 1 && context.Actions.RestoreCount == 1, "Kit must apply and restore once.");
+    Assert(context.Sessions.Records.Count == 1, "Completed session was not persisted.");
+    Assert(context.Sessions.Records[0].Metrics.SampleCount == 2, "Session metrics were not persisted.");
     Assert(context.Recovery.State is null, "Recovery state must clear after restore.");
     Assert(context.Log.Events.Any(value => value.Kind is ActivityEventKind.KitApplied), "KitApplied missing.");
     var ended = context.Log.Events.Single(value => value.Kind is ActivityEventKind.SessionEnded);
@@ -123,6 +126,22 @@ static async Task PersistsLanguagePreferenceAsync()
     finally { if (Directory.Exists(directory)) Directory.Delete(directory, true); }
 }
 
+static async Task PersistsSessionsAsync()
+{
+    var directory = Path.Combine(Path.GetTempPath(), "kit-sessions-" + Guid.NewGuid().ToString("N"));
+    try
+    {
+        var repository = new JsonLinesSessionRepository(new LocalDataPaths(directory));
+        var expected = new SessionRecord(Guid.NewGuid(), Guid.NewGuid(), "Competitive",
+            DateTimeOffset.UtcNow.AddMinutes(-10), DateTimeOffset.UtcNow, TimeSpan.FromMinutes(10),
+            new SessionMetrics(5, 12, 30, 400_000_000, 500_000_000));
+        await repository.AppendAsync(expected);
+        var actual = await repository.ReadRecentAsync(10);
+        Assert(actual.Count == 1 && actual[0] == expected, "Completed session did not round-trip.");
+    }
+    finally { if (Directory.Exists(directory)) Directory.Delete(directory, true); }
+}
+
 static void Assert(bool condition, string message)
 {
     if (!condition) throw new InvalidOperationException(message);
@@ -148,11 +167,14 @@ internal sealed class TestContext
     public FakeKitRepository Kits { get; }
     public FakeRecoveryRepository Recovery { get; }
     public RecordingActivityLog Log { get; } = new();
+    public FakeSessionRepository Sessions { get; } = new();
     public FakeWatcher Watcher { get; } = new();
+    public FakeResourceMonitor Monitor { get; } = new();
     public FakeInspector Inspector { get; } = new();
     public FakeActions Actions { get; } = new();
     public FakeClock Clock { get; } = new() { UtcNow = new DateTimeOffset(2026, 9, 26, 10, 0, 0, TimeSpan.Zero) };
-    public GameTrackingService CreateService() => new(Configuration, Kits, Recovery, Log, Watcher, Inspector, Actions, Clock);
+    public GameTrackingService CreateService() => new(Configuration, Kits, Recovery, Log, Sessions,
+        Watcher, Monitor, Inspector, Actions, Clock);
 }
 
 internal sealed class FakeConfigurationRepository(GameConfiguration? value) : IGameConfigurationRepository
@@ -180,6 +202,14 @@ internal sealed class RecordingActivityLog : IActivityLog
     public Task<IReadOnlyList<ActivityEvent>> ReadRecentAsync(int maximumCount, CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<ActivityEvent>>(Events.TakeLast(maximumCount).ToList());
 }
+internal sealed class FakeSessionRepository : ISessionRepository
+{
+    public List<SessionRecord> Records { get; } = [];
+    public Task AppendAsync(SessionRecord session, CancellationToken cancellationToken = default)
+    { Records.Add(session); return Task.CompletedTask; }
+    public Task<IReadOnlyList<SessionRecord>> ReadRecentAsync(int maximumCount, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<SessionRecord>>(Records.TakeLast(maximumCount).ToList());
+}
 internal sealed class FakeWatcher : IGameProcessWatcher
 {
     private Func<GameProcessChange, CancellationToken, ValueTask>? _handler;
@@ -194,6 +224,14 @@ internal sealed class FakeInspector : IGameProcessInspector
 {
     public bool IsRunning { get; set; }
     public bool IsExecutableRunning(string executablePath) => IsRunning;
+}
+internal sealed class FakeResourceMonitor : IProcessResourceMonitor
+{
+    public Task StartAsync(int processId, Func<ResourceSample, CancellationToken, ValueTask> onSample,
+        CancellationToken cancellationToken = default) => Task.CompletedTask;
+    public Task<SessionMetrics> StopAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(new SessionMetrics(2, 12.5, 20, 500_000_000, 600_000_000));
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 }
 internal sealed class FakeActions : ISessionActionCoordinator
 {

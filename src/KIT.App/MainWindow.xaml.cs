@@ -22,10 +22,12 @@ public partial class MainWindow : Window
     private readonly List<ApplicationTarget> _cleanApps = [];
     private readonly List<ApplicationTarget> _launchApps = [];
     private readonly List<ActivityEvent> _activity = [];
+    private readonly List<SessionRecord> _sessions = [];
     private bool _reloadingCatalog;
     private bool _changingLanguage;
     private bool _allowClose;
     private TrackingStatus? _lastStatus;
+    private ResourceSample? _lastResourceSample;
 
     public MainWindow(GameTrackingService trackingService, LocalDataPaths dataPaths,
         JsonUserPreferencesRepository preferencesRepository, string language)
@@ -37,6 +39,8 @@ public partial class MainWindow : Window
         _trackingService.StatusChanged += TrackingService_StatusChanged;
         _trackingService.ActivityRecorded += TrackingService_ActivityRecorded;
         _trackingService.CatalogChanged += TrackingService_CatalogChanged;
+        _trackingService.ResourceSampled += TrackingService_ResourceSampled;
+        _trackingService.SessionSaved += TrackingService_SessionSaved;
         Loaded += MainWindow_Loaded;
         Closing += MainWindow_Closing;
         _trayIcon = new Forms.NotifyIcon
@@ -73,6 +77,8 @@ public partial class MainWindow : Window
             ReloadCatalog(_trackingService.Catalog.ActiveKitId);
             _activity.AddRange(await _trackingService.ReadRecentActivityAsync());
             RenderActivity();
+            _sessions.AddRange(await _trackingService.ReadRecentSessionsAsync());
+            RenderSessions();
         }
         catch (Exception exception) { ShowError(S("ErrorStart"), exception); }
     }
@@ -241,12 +247,30 @@ public partial class MainWindow : Window
             _ => new SolidColorBrush(WpfColor.FromRgb(169, 179, 191))
         };
         if (KitSelector.SelectedItem is KitDefinition selected) LoadKitEditor(selected);
+        if (status.State is not TrackingState.GameRunning)
+        {
+            _lastResourceSample = null;
+            LiveMetricsText.Text = S("MonitoringIdle");
+        }
     });
 
     private void TrackingService_ActivityRecorded(object? sender, ActivityEvent activity) => Dispatcher.Invoke(() =>
     {
         _activity.Add(activity);
         RenderActivity();
+    });
+
+    private void TrackingService_ResourceSampled(object? sender, ResourceSample sample) => Dispatcher.Invoke(() =>
+    {
+        _lastResourceSample = sample;
+        LiveMetricsText.Text = string.Format(S("LiveMetricsFormat"), sample.CpuPercent,
+            sample.WorkingSetBytes / 1024d / 1024d);
+    });
+
+    private void TrackingService_SessionSaved(object? sender, SessionRecord session) => Dispatcher.Invoke(() =>
+    {
+        _sessions.Add(session);
+        RenderSessions();
     });
 
     private string FormatActivity(ActivityEvent activity)
@@ -269,6 +293,24 @@ public partial class MainWindow : Window
         ActivityText.ScrollToEnd();
     }
 
+    private void RenderSessions()
+    {
+        SessionsGrid.ItemsSource = null;
+        SessionsGrid.ItemsSource = _sessions.OrderByDescending(session => session.StartedAtUtc)
+            .Select(session => new SessionRow(
+                session.StartedAtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm"),
+                session.KitName,
+                FormatDuration(session.Duration),
+                session.Metrics.SampleCount == 0 ? "—" : $"{session.Metrics.AverageCpuPercent:F1}%",
+                session.Metrics.SampleCount == 0 ? "—" : $"{session.Metrics.PeakCpuPercent:F1}%",
+                session.Metrics.SampleCount == 0 ? "—" : $"{session.Metrics.AverageWorkingSetBytes / 1024d / 1024d:F0} {S("MegabytesUnit")}",
+                session.Metrics.SampleCount == 0 ? "—" : $"{session.Metrics.PeakWorkingSetBytes / 1024d / 1024d:F0} {S("MegabytesUnit")}"))
+            .ToList();
+    }
+
+    private static string FormatDuration(TimeSpan duration) =>
+        duration.TotalHours >= 1 ? duration.ToString(@"h\:mm\:ss") : duration.ToString(@"m\:ss");
+
     private string FormatStatus(TrackingStatus status) => status.State switch
     {
         TrackingState.NotConfigured => S("StatusNotConfigured"),
@@ -288,6 +330,11 @@ public partial class MainWindow : Window
         ActiveKitText.Text = string.Format(S("ActiveKitFormat"), _trackingService.ActiveKit.Name);
         if (_lastStatus is not null) StatusText.Text = FormatStatus(_lastStatus);
         RenderActivity();
+        RenderSessions();
+        LiveMetricsText.Text = _lastResourceSample is null
+            ? S("MonitoringIdle")
+            : string.Format(S("LiveMetricsFormat"), _lastResourceSample.CpuPercent,
+                _lastResourceSample.WorkingSetBytes / 1024d / 1024d);
         var oldMenu = _trayIcon.ContextMenuStrip;
         _trayIcon.ContextMenuStrip = BuildTrayMenu();
         oldMenu?.Dispose();
@@ -333,4 +380,6 @@ public partial class MainWindow : Window
     }
 
     private sealed record LanguageOption(string Code, string Name);
+    private sealed record SessionRow(string Date, string Kit, string Duration,
+        string AverageCpu, string PeakCpu, string AverageRam, string PeakRam);
 }

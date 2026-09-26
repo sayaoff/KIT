@@ -15,4 +15,5 @@ public sealed class LocalDataPaths
     public string RecoveryFile => Path.Combine(RootDirectory, "active-session.json");
     public string PreferencesFile => Path.Combine(RootDirectory, "preferences.json");
     public string ActivityLogFile => Path.Combine(RootDirectory, "activity.jsonl");
+    public string SessionsFile => Path.Combine(RootDirectory, "sessions.jsonl");
 }
