@@ -121,7 +121,7 @@ powershell -ExecutionPolicy Bypass -File scripts\build-release.ps1
 
 Сначала — стабильный Alpha 0.1: установщик, чистые Windows-тесты и исправление найденных ошибок. После этого: GPU/VRAM, графики сессий, Deck и безопасный import/export `.kit`.
 
-FPS, injection, memory reading, изменение файлов игры, arbitrary scripts, Workshop/plugins, cloud, macOS и другие игры не входят в Alpha 0.1.
+FPS, injection, memory reading, изменение файлов игры, arbitrary scripts, Workshop/plugins, cloud и другие игры не входят в Alpha 0.1.
 
 ## Лицензия
 
