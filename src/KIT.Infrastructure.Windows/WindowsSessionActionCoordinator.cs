@@ -8,7 +8,7 @@ public sealed class WindowsSessionActionCoordinator : ISessionActionCoordinator
 {
     private static readonly TimeSpan GracefulCloseTimeout = TimeSpan.FromSeconds(2);
 
-    public async Task<ActionExecutionResult> ApplyAsync(KitDefinition kit, DateTimeOffset appliedAtUtc,
+    public async Task<ActionExecutionResult> ApplyAsync(KitExecutionPlan kit, DateTimeOffset appliedAtUtc,
         CancellationToken cancellationToken = default)
     {
         var closed = new List<ClosedApplication>();
@@ -62,7 +62,7 @@ public sealed class WindowsSessionActionCoordinator : ISessionActionCoordinator
         }
 
         return new ActionExecutionResult(
-            new AppliedKitState(kit.Id, kit.Name, appliedAtUtc, closed, launched), warnings);
+            new AppliedKitState(kit.KitId, kit.KitName, appliedAtUtc, closed, launched), warnings);
     }
 
     public async Task<RestoreExecutionResult> RestoreAsync(AppliedKitState state,

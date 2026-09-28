@@ -39,7 +39,8 @@ The script builds and tests the solution, creates a self-contained `win-x64` por
 KIT stores user data in `%LOCALAPPDATA%\KIT`:
 
 - `configuration.json` — selected `cs2.exe`;
-- `kits.json` — Kits and the Active Kit;
+- `kits.json` — App Library, Kits, and the Active Kit;
+- `kits.v1.backup.json` — one-time backup created when Alpha 0.1 Kit data is migrated;
 - `active-session.json` — crash-recovery state;
 - `preferences.json` — language, appearance, and Windows startup preference;
 - `activity.jsonl` — events and warnings;

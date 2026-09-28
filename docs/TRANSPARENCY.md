@@ -16,7 +16,7 @@ KIT publishes its source so users can inspect what the Windows build does and bu
 - No input automation or anti-cheat interaction.
 - No telemetry, analytics, accounts, cloud synchronization, or network communication.
 - No arbitrary scripts, plugins, or Workshop content.
-- No permanent administrator rights. The RC1 installer is per-user.
+- No permanent administrator rights. The installer is per-user.
 
 ## Verify a release
 

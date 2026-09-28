@@ -7,7 +7,7 @@ $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 $publish = Join-Path $root "artifacts\publish"
 $installer = Join-Path $root "artifacts\installer"
-$portableZip = Join-Path $root "artifacts\KIT-Alpha-0.1.0-RC1-win-x64.zip"
+$portableZip = Join-Path $root "artifacts\KIT-Alpha-0.2.1-Foundation-win-x64.zip"
 
 Push-Location $root
 try {

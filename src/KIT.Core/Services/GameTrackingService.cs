@@ -118,16 +118,78 @@ public sealed class GameTrackingService : IAsyncDisposable
         {
             Name = normalizedName,
             IsVanilla = false,
-            CleanModeApps = NormalizeTargets(kit.CleanModeApps),
-            LaunchApps = NormalizeTargets(kit.LaunchApps)
+            CleanModeAppIds = NormalizeApplicationIds(kit.CleanModeAppIds),
+            LaunchAppIds = NormalizeApplicationIds(kit.LaunchAppIds)
         };
-        if (Configuration is not null && normalized.CleanModeApps.Concat(normalized.LaunchApps)
+        if (Configuration is not null && ResolveApplications(
+                normalized.CleanModeAppIds.Concat(normalized.LaunchAppIds))
                 .Any(target => string.Equals(target.ExecutablePath, Configuration.ExecutablePath,
                     StringComparison.OrdinalIgnoreCase)))
             throw new InvalidOperationException("cs2.exe cannot be used as a Kit action target.");
         Catalog = Catalog with
         {
             Kits = Catalog.Kits.Select(candidate => candidate.Id == normalized.Id ? normalized : candidate).ToList()
+        };
+        await SaveCatalogAsync(cancellationToken);
+    }
+
+    public IReadOnlyList<ApplicationDefinition> ResolveApplications(IEnumerable<Guid> applicationIds)
+    {
+        var byId = Catalog.Applications.ToDictionary(application => application.Id);
+        return applicationIds.Distinct().Where(byId.ContainsKey).Select(id => byId[id]).ToList();
+    }
+
+    public async Task<ApplicationDefinition> RegisterApplicationAsync(string executablePath,
+        string? displayName = null, CancellationToken cancellationToken = default)
+    {
+        EnsureNoActiveSession("The App Library cannot be changed while CS2 is running.");
+        var normalizedPath = ValidateApplicationPath(executablePath);
+        var existing = Catalog.Applications.FirstOrDefault(application =>
+            string.Equals(application.ExecutablePath, normalizedPath, StringComparison.OrdinalIgnoreCase));
+        if (existing is not null) return existing;
+
+        var application = new ApplicationDefinition(Guid.NewGuid(),
+            NormalizeApplicationName(displayName, normalizedPath), normalizedPath);
+        Catalog = Catalog with { Applications = [.. Catalog.Applications, application] };
+        await SaveCatalogAsync(cancellationToken);
+        return application;
+    }
+
+    public async Task UpdateApplicationAsync(ApplicationDefinition application,
+        CancellationToken cancellationToken = default)
+    {
+        EnsureNoActiveSession("The App Library cannot be changed while CS2 is running.");
+        if (Catalog.Applications.All(candidate => candidate.Id != application.Id))
+            throw new InvalidOperationException("The selected application no longer exists.");
+        var path = ValidateApplicationPath(application.ExecutablePath);
+        if (Catalog.Applications.Any(candidate => candidate.Id != application.Id &&
+                string.Equals(candidate.ExecutablePath, path, StringComparison.OrdinalIgnoreCase)))
+            throw new InvalidOperationException("This executable is already in the App Library.");
+        var normalized = application with
+        {
+            ExecutablePath = path,
+            DisplayName = NormalizeApplicationName(application.DisplayName, path)
+        };
+        Catalog = Catalog with
+        {
+            Applications = Catalog.Applications.Select(candidate =>
+                candidate.Id == normalized.Id ? normalized : candidate).ToList()
+        };
+        await SaveCatalogAsync(cancellationToken);
+    }
+
+    public async Task DeleteApplicationAsync(Guid applicationId, CancellationToken cancellationToken = default)
+    {
+        EnsureNoActiveSession("The App Library cannot be changed while CS2 is running.");
+        if (Catalog.Applications.All(application => application.Id != applicationId)) return;
+        Catalog = Catalog with
+        {
+            Applications = Catalog.Applications.Where(application => application.Id != applicationId).ToList(),
+            Kits = Catalog.Kits.Select(kit => kit with
+            {
+                CleanModeAppIds = kit.CleanModeAppIds.Where(id => id != applicationId).ToList(),
+                LaunchAppIds = kit.LaunchAppIds.Where(id => id != applicationId).ToList()
+            }).ToList()
         };
         await SaveCatalogAsync(cancellationToken);
     }
@@ -224,7 +286,7 @@ public sealed class GameTrackingService : IAsyncDisposable
         await _recoveryRepository.SaveAsync(new SessionRecoveryState(_currentSession, emptyState), cancellationToken);
         try
         {
-            var result = await _actionCoordinator.ApplyAsync(kit, _clock.UtcNow, cancellationToken);
+            var result = await _actionCoordinator.ApplyAsync(CreateExecutionPlan(kit), _clock.UtcNow, cancellationToken);
             _appliedKit = result.State;
             await _recoveryRepository.SaveAsync(new SessionRecoveryState(_currentSession, result.State), cancellationToken);
             await RecordAsync(new ActivityEvent(Guid.NewGuid(), _currentSession.Id, ActivityEventKind.KitApplied,
@@ -360,10 +422,25 @@ public sealed class GameTrackingService : IAsyncDisposable
     private static KitCatalog NormalizeCatalog(KitCatalog? catalog)
     {
         if (catalog is null) return KitCatalog.CreateDefault();
-        var kits = catalog.Kits.Where(kit => !kit.IsVanilla).ToList();
+        var applications = (catalog.Applications ?? [])
+            .Where(application => application.Id != Guid.Empty && !string.IsNullOrWhiteSpace(application.ExecutablePath))
+            .Select(application => application with
+            {
+                DisplayName = NormalizeApplicationName(application.DisplayName, application.ExecutablePath),
+                ExecutablePath = application.ExecutablePath.Trim()
+            })
+            .DistinctBy(application => application.Id)
+            .DistinctBy(application => application.ExecutablePath, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var validApplicationIds = applications.Select(application => application.Id).ToHashSet();
+        var kits = (catalog.Kits ?? []).Where(kit => !kit.IsVanilla).Select(kit => kit with
+        {
+            CleanModeAppIds = (kit.CleanModeAppIds ?? []).Where(validApplicationIds.Contains).Distinct().ToList(),
+            LaunchAppIds = (kit.LaunchAppIds ?? []).Where(validApplicationIds.Contains).Distinct().ToList()
+        }).ToList();
         kits.Insert(0, KitCatalog.CreateDefault().Kits[0]);
         var activeId = kits.Any(kit => kit.Id == catalog.ActiveKitId) ? catalog.ActiveKitId : KitCatalog.VanillaKitId;
-        return new KitCatalog(activeId, kits);
+        return new KitCatalog(KitCatalog.CurrentSchemaVersion, activeId, applications, kits);
     }
 
     private static string ValidateKitName(string name)
@@ -380,11 +457,37 @@ public sealed class GameTrackingService : IAsyncDisposable
             throw new InvalidOperationException("A Kit with this name already exists.");
     }
 
-    private static List<ApplicationTarget> NormalizeTargets(IEnumerable<ApplicationTarget> targets) =>
-        targets.Select(target => new ApplicationTarget(Path.GetFullPath(target.ExecutablePath),
-                string.IsNullOrWhiteSpace(target.DisplayName) ? Path.GetFileNameWithoutExtension(target.ExecutablePath) : target.DisplayName.Trim()))
-            .Where(target => string.Equals(Path.GetExtension(target.ExecutablePath), ".exe", StringComparison.OrdinalIgnoreCase))
-            .DistinctBy(target => target.ExecutablePath, StringComparer.OrdinalIgnoreCase).ToList();
+    private List<Guid> NormalizeApplicationIds(IEnumerable<Guid> applicationIds)
+    {
+        var validIds = Catalog.Applications.Select(application => application.Id).ToHashSet();
+        return applicationIds.Where(validIds.Contains).Distinct().ToList();
+    }
+
+    private KitExecutionPlan CreateExecutionPlan(KitDefinition kit) => new(
+        kit.Id,
+        kit.Name,
+        ResolveApplications(kit.CleanModeAppIds),
+        ResolveApplications(kit.LaunchAppIds));
+
+    private string ValidateApplicationPath(string executablePath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(executablePath);
+        var normalizedPath = Path.GetFullPath(executablePath);
+        if (!string.Equals(Path.GetExtension(normalizedPath), ".exe", StringComparison.OrdinalIgnoreCase))
+            throw new ArgumentException("The application must be a Windows .exe file.", nameof(executablePath));
+        if (Configuration is not null && string.Equals(normalizedPath, Configuration.ExecutablePath,
+                StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("cs2.exe cannot be used as a Kit action target.");
+        return normalizedPath;
+    }
+
+    private static string NormalizeApplicationName(string? displayName, string executablePath) =>
+        string.IsNullOrWhiteSpace(displayName)
+            ? PortableFileNameWithoutExtension(executablePath)
+            : displayName.Trim();
+
+    private static string PortableFileNameWithoutExtension(string path) =>
+        Path.GetFileNameWithoutExtension(path.Replace('\\', '/'));
 
     private void EnsureNoActiveSession(string message)
     {

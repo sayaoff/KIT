@@ -22,8 +22,8 @@ public partial class MainWindow : Window
     private readonly WindowsStartupRegistration _startupRegistration;
     private readonly Forms.NotifyIcon _trayIcon;
     private readonly Drawing.Icon _appIcon;
-    private readonly List<ApplicationTarget> _cleanApps = [];
-    private readonly List<ApplicationTarget> _launchApps = [];
+    private readonly List<ApplicationDefinition> _cleanApps = [];
+    private readonly List<ApplicationDefinition> _launchApps = [];
     private readonly List<ActivityEvent> _activity = [];
     private readonly List<SessionRecord> _sessions = [];
     private bool _reloadingCatalog;
@@ -192,8 +192,8 @@ public partial class MainWindow : Window
         var updated = selected with
         {
             Name = KitNameText.Text,
-            CleanModeApps = [.. _cleanApps],
-            LaunchApps = [.. _launchApps]
+            CleanModeAppIds = _cleanApps.Select(application => application.Id).ToList(),
+            LaunchAppIds = _launchApps.Select(application => application.Id).ToList()
         };
         await RunUiActionAsync(async () =>
         {
@@ -224,12 +224,15 @@ public partial class MainWindow : Window
         }, S("ErrorDelete"));
     }
 
-    private void AddCleanApp_Click(object sender, RoutedEventArgs e) => AddApplication(_cleanApps, CleanAppsList, isCleanMode: true);
-    private void AddLaunchApp_Click(object sender, RoutedEventArgs e) => AddApplication(_launchApps, LaunchAppsList, isCleanMode: false);
+    private async void AddCleanApp_Click(object sender, RoutedEventArgs e) =>
+        await AddApplicationAsync(_cleanApps, CleanAppsList, isCleanMode: true);
+    private async void AddLaunchApp_Click(object sender, RoutedEventArgs e) =>
+        await AddApplicationAsync(_launchApps, LaunchAppsList, isCleanMode: false);
     private void RemoveCleanApp_Click(object sender, RoutedEventArgs e) => RemoveApplication(_cleanApps, CleanAppsList);
     private void RemoveLaunchApp_Click(object sender, RoutedEventArgs e) => RemoveApplication(_launchApps, LaunchAppsList);
 
-    private void AddApplication(List<ApplicationTarget> targets, System.Windows.Controls.ListBox listBox, bool isCleanMode)
+    private async Task AddApplicationAsync(List<ApplicationDefinition> targets,
+        System.Windows.Controls.ListBox listBox, bool isCleanMode)
     {
         var dialog = new WpfOpenFileDialog
         {
@@ -247,18 +250,29 @@ public partial class MainWindow : Window
         if (isCleanMode && WpfMessageBox.Show(this, S("CleanConfirm"), S("CleanConfirmTitle"),
                 MessageBoxButton.YesNo, MessageBoxImage.Warning) is not MessageBoxResult.Yes) return;
         if (targets.Any(target => string.Equals(target.ExecutablePath, dialog.FileName, StringComparison.OrdinalIgnoreCase))) return;
-        targets.Add(new ApplicationTarget(Path.GetFullPath(dialog.FileName), Path.GetFileNameWithoutExtension(dialog.FileName)));
-        RefreshTargetList(listBox, targets);
+
+        var cleanIds = _cleanApps.Select(application => application.Id).ToList();
+        var launchIds = _launchApps.Select(application => application.Id).ToList();
+        var pendingName = KitNameText.Text;
+        await RunUiActionAsync(async () =>
+        {
+            var application = await _trackingService.RegisterApplicationAsync(
+                dialog.FileName, Path.GetFileNameWithoutExtension(dialog.FileName));
+            RestoreEditorApplications(cleanIds, launchIds);
+            KitNameText.Text = pendingName;
+            if (targets.All(candidate => candidate.Id != application.Id)) targets.Add(application);
+            RefreshTargetList(listBox, targets);
+        }, S("ErrorAppLibrary"));
     }
 
-    private static void RemoveApplication(List<ApplicationTarget> targets, System.Windows.Controls.ListBox listBox)
+    private static void RemoveApplication(List<ApplicationDefinition> targets, System.Windows.Controls.ListBox listBox)
     {
-        if (listBox.SelectedItem is not ApplicationTarget selected) return;
+        if (listBox.SelectedItem is not ApplicationDefinition selected) return;
         targets.Remove(selected);
         RefreshTargetList(listBox, targets);
     }
 
-    private static void RefreshTargetList(System.Windows.Controls.ListBox listBox, List<ApplicationTarget> targets)
+    private static void RefreshTargetList(System.Windows.Controls.ListBox listBox, List<ApplicationDefinition> targets)
     {
         listBox.ItemsSource = null;
         listBox.ItemsSource = targets;
@@ -268,9 +282,9 @@ public partial class MainWindow : Window
     {
         KitNameText.Text = kit.Name;
         _cleanApps.Clear();
-        _cleanApps.AddRange(kit.CleanModeApps);
+        _cleanApps.AddRange(_trackingService.ResolveApplications(kit.CleanModeAppIds));
         _launchApps.Clear();
-        _launchApps.AddRange(kit.LaunchApps);
+        _launchApps.AddRange(_trackingService.ResolveApplications(kit.LaunchAppIds));
         RefreshTargetList(CleanAppsList, _cleanApps);
         RefreshTargetList(LaunchAppsList, _launchApps);
         var editable = !kit.IsVanilla && !_trackingService.IsGameRunning;
@@ -284,6 +298,16 @@ public partial class MainWindow : Window
         ActivateKitButton.IsEnabled = !_trackingService.IsGameRunning && kit.Id != _trackingService.Catalog.ActiveKitId;
     }
 
+    private void RestoreEditorApplications(IEnumerable<Guid> cleanIds, IEnumerable<Guid> launchIds)
+    {
+        _cleanApps.Clear();
+        _cleanApps.AddRange(_trackingService.ResolveApplications(cleanIds));
+        _launchApps.Clear();
+        _launchApps.AddRange(_trackingService.ResolveApplications(launchIds));
+        RefreshTargetList(CleanAppsList, _cleanApps);
+        RefreshTargetList(LaunchAppsList, _launchApps);
+    }
+
     private void ReloadCatalog(Guid selectedKitId)
     {
         _reloadingCatalog = true;
@@ -293,7 +317,22 @@ public partial class MainWindow : Window
                                    ?? _trackingService.ActiveKit;
         _reloadingCatalog = false;
         if (KitSelector.SelectedItem is KitDefinition selected) LoadKitEditor(selected);
+        RefreshApplicationLibrary();
         RenderDashboard();
+    }
+
+    private void RefreshApplicationLibrary()
+    {
+        var selectedId = LibraryAppsList.SelectedItem is ApplicationDefinition selected ? selected.Id : (Guid?)null;
+        var applications = _trackingService.Catalog.Applications
+            .OrderBy(application => application.DisplayName, StringComparer.CurrentCultureIgnoreCase).ToList();
+        LibraryAppsList.ItemsSource = null;
+        LibraryAppsList.ItemsSource = applications;
+        LibraryAppsList.SelectedItem = applications.FirstOrDefault(application => application.Id == selectedId);
+        AddLibraryAppButton.IsEnabled = !_trackingService.IsGameRunning;
+        var canEdit = !_trackingService.IsGameRunning && LibraryAppsList.SelectedItem is ApplicationDefinition;
+        ChangeLibraryPathButton.IsEnabled = canEdit;
+        DeleteLibraryAppButton.IsEnabled = canEdit;
     }
 
     private void TrackingService_CatalogChanged(object? sender, KitCatalog catalog) =>
@@ -316,6 +355,7 @@ public partial class MainWindow : Window
             _ => new SolidColorBrush(WpfColor.FromRgb(140, 144, 151))
         };
         if (KitSelector.SelectedItem is KitDefinition selected) LoadKitEditor(selected);
+        RefreshApplicationLibrary();
         if (status.State is not TrackingState.GameRunning)
         {
             _lastResourceSample = null;
@@ -382,7 +422,7 @@ public partial class MainWindow : Window
         var kit = _trackingService.ActiveKit;
         HomeActiveKitNameText.Text = kit.Name;
         HomeKitSummaryText.Text = string.Format(S("KitActionsSummary"),
-            kit.CleanModeApps.Count, kit.LaunchApps.Count);
+            kit.CleanModeAppIds.Count, kit.LaunchAppIds.Count);
         HomeGameStateText.Text = _lastStatus is null ? S("StatusStarting") : FormatStatus(_lastStatus);
 
         var last = _sessions.OrderByDescending(session => session.EndedAtUtc).FirstOrDefault();
@@ -486,6 +526,64 @@ public partial class MainWindow : Window
         App.ApplyAppearance(_currentTheme, _currentVisualStyle);
         await SavePreferencesAsync();
     }
+
+    private void LibraryAppsList_SelectionChanged(object sender,
+        System.Windows.Controls.SelectionChangedEventArgs e)
+    {
+        var canEdit = !_trackingService.IsGameRunning && LibraryAppsList.SelectedItem is ApplicationDefinition;
+        ChangeLibraryPathButton.IsEnabled = canEdit;
+        DeleteLibraryAppButton.IsEnabled = canEdit;
+    }
+
+    private async void AddLibraryApp_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = CreateApplicationDialog();
+        if (dialog.ShowDialog(this) is not true) return;
+        await RunUiActionAsync(async () =>
+        {
+            var application = await _trackingService.RegisterApplicationAsync(
+                dialog.FileName, Path.GetFileNameWithoutExtension(dialog.FileName));
+            RefreshApplicationLibrary();
+            LibraryAppsList.SelectedItem = _trackingService.Catalog.Applications
+                .FirstOrDefault(candidate => candidate.Id == application.Id);
+        }, S("ErrorAppLibrary"));
+    }
+
+    private async void ChangeLibraryPath_Click(object sender, RoutedEventArgs e)
+    {
+        if (LibraryAppsList.SelectedItem is not ApplicationDefinition selected) return;
+        var dialog = CreateApplicationDialog();
+        dialog.InitialDirectory = Path.GetDirectoryName(selected.ExecutablePath);
+        if (dialog.ShowDialog(this) is not true) return;
+        await RunUiActionAsync(async () =>
+        {
+            await _trackingService.UpdateApplicationAsync(selected with
+            {
+                ExecutablePath = dialog.FileName
+            });
+            RefreshApplicationLibrary();
+        }, S("ErrorAppLibrary"));
+    }
+
+    private async void DeleteLibraryApp_Click(object sender, RoutedEventArgs e)
+    {
+        if (LibraryAppsList.SelectedItem is not ApplicationDefinition selected) return;
+        if (WpfMessageBox.Show(this, string.Format(S("DeleteLibraryPrompt"), selected.DisplayName), "KIT",
+                MessageBoxButton.YesNo, MessageBoxImage.Warning) is not MessageBoxResult.Yes) return;
+        await RunUiActionAsync(async () =>
+        {
+            await _trackingService.DeleteApplicationAsync(selected.Id);
+            RefreshApplicationLibrary();
+        }, S("ErrorAppLibrary"));
+    }
+
+    private static WpfOpenFileDialog CreateApplicationDialog() => new()
+    {
+        Title = S("SelectApplication"),
+        Filter = "Windows applications (*.exe)|*.exe",
+        CheckFileExists = true,
+        Multiselect = false
+    };
 
     private Task SavePreferencesAsync() =>
         _preferencesRepository.SaveAsync(new UserPreferences(

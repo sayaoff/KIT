@@ -6,7 +6,7 @@
 
   <p>
     <img alt="Platform" src="https://img.shields.io/badge/platform-Windows%2010%2F11-66798d">
-    <img alt="Version" src="https://img.shields.io/badge/version-0.1.0--alpha.1-809bb7">
+    <img alt="Version" src="https://img.shields.io/badge/version-0.2.1--alpha.1-809bb7">
     <img alt=".NET" src="https://img.shields.io/badge/.NET-10.0-512bd4">
     <img alt="License" src="https://img.shields.io/badge/license-PolyForm%20Shield-555b66">
   </p>
@@ -26,9 +26,10 @@
 3. KIT замечает запуск CS2, применяет Kit и сворачивается в трей.
 4. После закрытия игры KIT восстанавливает окружение и сохраняет сессию.
 
-## Возможности Alpha 0.1
+## Возможности Alpha 0.2
 
 - Несколько Kits и безопасный неизменяемый **Vanilla Kit**.
+- Общая **Библиотека приложений**: путь к программе хранится один раз и используется во всех Kits.
 - **Clean Mode** — полное завершение выбранных приложений, включая процессы в трее.
 - **Launch Apps** — запуск выбранных приложений вместе с CS2.
 - Автоматический **Restore** после игры и восстановление после аварийного завершения KIT.
@@ -55,7 +56,7 @@ KIT работает **вокруг игры**, а не внутри неё:
 ## Установка
 
 1. Откройте [Releases](https://github.com/sayaoff/KIT/releases/latest).
-2. Скачайте portable-архив `KIT-Alpha-0.1-RC1-win-x64.zip`.
+2. Скачайте последний portable-архив для `win-x64`.
 3. Полностью распакуйте архив и запустите `KIT.exe`.
 4. На главной странице выберите `cs2.exe` из установленной папки Counter-Strike 2.
 
@@ -76,9 +77,9 @@ Alpha пока не подписана коммерческим сертифик
 
 ## Дальше
 
-Сначала — стабильный Alpha 0.1: установщик, чистые Windows-тесты и исправление найденных ошибок. После этого: GPU/VRAM, графики сессий, Deck и безопасный import/export `.kit`.
+Alpha 0.2 развивается по слоям. Foundation уже переводит приложения в общую библиотеку и автоматически переносит данные Alpha 0.1, сохраняя `kits.v1.backup.json`. Следующие этапы: типизированные Actions/Restore, расширенный мониторинг, Deck и безопасный import/export `.kit`.
 
-FPS, injection, memory reading, изменение файлов игры, arbitrary scripts, Workshop/plugins, cloud и другие игры не входят в Alpha 0.1.
+FPS, injection, memory reading, изменение файлов игры, arbitrary scripts, Workshop/plugins, cloud и другие игры не входят в текущий scope.
 
 ## Лицензия
 

@@ -11,6 +11,8 @@ var tests = new (string Name, Func<Task> Run)[]
     ("recovers actions after an interrupted session", RecoversInterruptedSessionAsync),
     ("rejects a non-CS2 executable", RejectsNonCs2ExecutableAsync),
     ("persists configuration as JSON", PersistsConfigurationAsync),
+    ("migrates legacy Kits into the App Library", MigratesLegacyKitsAsync),
+    ("shares App Library entries across Kits", SharesApplicationsAcrossKitsAsync),
     ("persists language preference", PersistsLanguagePreferenceAsync),
     ("persists completed sessions", PersistsSessionsAsync)
 };
@@ -42,10 +44,12 @@ static async Task StartsUnconfiguredAsync()
 static async Task RecordsSessionAsync()
 {
     const string path = @"C:\Games\CS2\cs2.exe";
+    var cleanApp = new ApplicationDefinition(Guid.NewGuid(), "Chat", @"C:\Apps\chat.exe");
+    var launchApp = new ApplicationDefinition(Guid.NewGuid(), "Music", @"C:\Apps\music.exe");
     var custom = new KitDefinition(Guid.NewGuid(), "Competitive", false,
-        [new ApplicationTarget(@"C:\Apps\chat.exe", "Chat")],
-        [new ApplicationTarget(@"C:\Apps\music.exe", "Music")]);
-    var context = new TestContext(new GameConfiguration(path), new KitCatalog(custom.Id,
+        [cleanApp.Id], [launchApp.Id]);
+    var context = new TestContext(new GameConfiguration(path), new KitCatalog(
+        KitCatalog.CurrentSchemaVersion, custom.Id, [cleanApp, launchApp],
         [KitCatalog.CreateDefault().Kits[0], custom]));
     await using var service = context.CreateService();
     await service.StartAsync();
@@ -112,6 +116,69 @@ static async Task PersistsConfigurationAsync()
         Assert(await repository.LoadAsync() == expected, "Configuration did not round-trip.");
     }
     finally { if (Directory.Exists(directory)) Directory.Delete(directory, true); }
+}
+
+static async Task MigratesLegacyKitsAsync()
+{
+    var directory = Path.Combine(Path.GetTempPath(), "kit-migration-" + Guid.NewGuid().ToString("N"));
+    try
+    {
+        var paths = new LocalDataPaths(directory);
+        Directory.CreateDirectory(directory);
+        var kitId = Guid.NewGuid();
+        await File.WriteAllTextAsync(paths.KitsFile, $$"""
+        {
+          "activeKitId": "{{kitId}}",
+          "kits": [
+            {
+              "id": "{{kitId}}",
+              "name": "Legacy",
+              "isVanilla": false,
+              "cleanModeApps": [ { "executablePath": "C:\\Apps\\chat.exe", "displayName": "Chat" } ],
+              "launchApps": [ { "executablePath": "C:\\Apps\\chat.exe", "displayName": "Chat" } ]
+            }
+          ]
+        }
+        """);
+
+        var migrated = await new JsonKitRepository(paths).LoadAsync();
+        Assert(migrated?.SchemaVersion == KitCatalog.CurrentSchemaVersion, "Schema version was not migrated.");
+        Assert(File.Exists(paths.KitsV1BackupFile), "The legacy Kits backup was not created.");
+        Assert(migrated?.Applications.Count == 1, "A shared legacy executable should become one library app.");
+        Assert(migrated?.Kits.Single().CleanModeAppIds.Single() == migrated?.Applications.Single().Id,
+            "Clean Mode did not reference the migrated app.");
+        Assert(migrated?.Kits.Single().LaunchAppIds.Single() == migrated?.Applications.Single().Id,
+            "Launch Apps did not reference the migrated app.");
+    }
+    finally { if (Directory.Exists(directory)) Directory.Delete(directory, true); }
+}
+
+static async Task SharesApplicationsAcrossKitsAsync()
+{
+    var directory = Path.Combine(Path.GetTempPath(), "kit-library-" + Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(directory);
+    try
+    {
+        var firstPath = Path.Combine(directory, "chat.exe");
+        var secondPath = Path.Combine(directory, "chat-new.exe");
+        await File.WriteAllTextAsync(firstPath, "");
+        await File.WriteAllTextAsync(secondPath, "");
+        var context = new TestContext();
+        await using var service = context.CreateService();
+        await service.StartAsync();
+        var application = await service.RegisterApplicationAsync(firstPath, "Chat");
+        var first = await service.CreateKitAsync("First");
+        var second = await service.CreateKitAsync("Second");
+        await service.SaveKitAsync(first with { CleanModeAppIds = [application.Id] });
+        await service.SaveKitAsync(second with { LaunchAppIds = [application.Id] });
+        await service.UpdateApplicationAsync(application with { ExecutablePath = secondPath });
+
+        Assert(service.ResolveApplications(service.Catalog.Kits.Single(kit => kit.Id == first.Id).CleanModeAppIds)
+            .Single().ExecutablePath == Path.GetFullPath(secondPath), "First Kit did not receive the shared path update.");
+        Assert(service.ResolveApplications(service.Catalog.Kits.Single(kit => kit.Id == second.Id).LaunchAppIds)
+            .Single().ExecutablePath == Path.GetFullPath(secondPath), "Second Kit did not receive the shared path update.");
+    }
+    finally { Directory.Delete(directory, true); }
 }
 
 static async Task PersistsLanguagePreferenceAsync()
@@ -247,10 +314,10 @@ internal sealed class FakeActions : ISessionActionCoordinator
 {
     public int ApplyCount { get; private set; }
     public int RestoreCount { get; private set; }
-    public Task<ActionExecutionResult> ApplyAsync(KitDefinition kit, DateTimeOffset time, CancellationToken cancellationToken = default)
+    public Task<ActionExecutionResult> ApplyAsync(KitExecutionPlan kit, DateTimeOffset time, CancellationToken cancellationToken = default)
     {
         ApplyCount++;
-        return Task.FromResult(new ActionExecutionResult(new AppliedKitState(kit.Id, kit.Name, time,
+        return Task.FromResult(new ActionExecutionResult(new AppliedKitState(kit.KitId, kit.KitName, time,
             kit.CleanModeApps.Select(value => new ClosedApplication(value.ExecutablePath)).ToList(),
             kit.LaunchApps.Select((value, index) => new LaunchedApplication(value.ExecutablePath, index + 100)).ToList()), []));
     }

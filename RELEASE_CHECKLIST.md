@@ -1,11 +1,14 @@
-# KIT Alpha 0.1 release checklist
+# KIT Alpha 0.2.1 Foundation test checklist
 
 ## Clean Windows test
 
-- Install RC1 for the current user without administrator privileges.
+- Install the Foundation build for the current user without administrator privileges.
 - Confirm the Start menu shortcut and optional desktop shortcut use the KIT icon.
 - Confirm the first manual launch immediately shows a populated Home screen.
 - Select the expected `cs2.exe`, create a Kit, save it, and make it active.
+- Add one executable to the App Library and reuse it in two different Kits.
+- Change that executable path in Settings and confirm both Kits use the new path.
+- Start once with existing Alpha 0.1 data and confirm Kits are preserved and `%LOCALAPPDATA%\KIT\kits.v1.backup.json` is created.
 - Verify Clean Mode and Launch Apps using disposable test applications.
 - Close CS2 and verify Restore plus a completed session record.
 - Enable Windows startup, reboot, and confirm KIT starts only in the tray.

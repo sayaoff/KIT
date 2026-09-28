@@ -45,6 +45,9 @@
     <sys:String x:Key="StartWithWindows">Start KIT with Windows</sys:String>
     <sys:String x:Key="StartWithWindowsDescription">KIT starts in the system tray without administrator rights. A manual launch always opens the window.</sys:String>
     <sys:String x:Key="OpenDataFolder">Open data and logs folder</sys:String>
+    <sys:String x:Key="AppLibrary">App Library</sys:String>
+    <sys:String x:Key="AppLibraryDescription">Apps are stored once and shared by every Kit. Change an executable path here to update all Kits that use it.</sys:String>
+    <sys:String x:Key="ChangePath">Change path</sys:String>
     <sys:String x:Key="SessionHistory">Session history</sys:String>
     <sys:String x:Key="SessionDate">Started</sys:String>
     <sys:String x:Key="KitColumn">Kit</sys:String>
@@ -71,6 +74,7 @@
     <sys:String x:Key="LocateCs2">Locate Counter-Strike 2</sys:String>
     <sys:String x:Key="SelectApplication">Select an application</sys:String>
     <sys:String x:Key="DeletePrompt">Delete ‘{0}’?</sys:String>
+    <sys:String x:Key="DeleteLibraryPrompt">Remove ‘{0}’ from the App Library and every Kit that uses it?</sys:String>
     <sys:String x:Key="Cs2ActionError">CS2 cannot be added as a Kit action.</sys:String>
     <sys:String x:Key="CleanConfirm">Clean Mode will fully terminate this application if it stays in the system tray. Unsaved data may be lost. Add it?</sys:String>
     <sys:String x:Key="CleanConfirmTitle">Add to Clean Mode</sys:String>
@@ -82,6 +86,7 @@
     <sys:String x:Key="ErrorDelete">Could not delete the Kit.</sys:String>
     <sys:String x:Key="ErrorStartupSetting">Could not change the startup setting.</sys:String>
     <sys:String x:Key="ErrorOpenDataFolder">Could not open the data folder.</sys:String>
+    <sys:String x:Key="ErrorAppLibrary">Could not update the App Library.</sys:String>
     <sys:String x:Key="DataFolder">Data folder: {0}</sys:String>
     <sys:String x:Key="NewKit">New Kit</sys:String>
     <sys:String x:Key="ActivitySessionStarted">Session started</sys:String>

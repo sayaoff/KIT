@@ -5,7 +5,7 @@ namespace KIT.Core.Abstractions;
 public interface ISessionActionCoordinator
 {
     Task<ActionExecutionResult> ApplyAsync(
-        KitDefinition kit,
+        KitExecutionPlan kit,
         DateTimeOffset appliedAtUtc,
         CancellationToken cancellationToken = default);
 
@@ -13,4 +13,3 @@ public interface ISessionActionCoordinator
         AppliedKitState state,
         CancellationToken cancellationToken = default);
 }
-

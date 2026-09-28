@@ -11,9 +11,9 @@
     <Description>KIT works around the game, never inside it.</Description>
     <Company>KIT Project</Company>
     <Copyright>Copyright © 2026 KIT Project</Copyright>
-    <Version>0.1.0-alpha.1</Version>
-    <AssemblyVersion>0.1.0.0</AssemblyVersion>
-    <FileVersion>0.1.0.0</FileVersion>
+    <Version>0.2.1-alpha.1</Version>
+    <AssemblyVersion>0.2.1.0</AssemblyVersion>
+    <FileVersion>0.2.1.0</FileVersion>
     <ApplicationIcon>Assets\KIT.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>

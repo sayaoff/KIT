@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.1-alpha.1 — Foundation
+
+- Added a shared App Library for executables used by Kits.
+- Changed Kits to reference library entries instead of duplicating executable paths.
+- Added path updates and safe removal of library entries across every Kit that uses them.
+- Added automatic migration from the Alpha 0.1 Kit format with a one-time `kits.v1.backup.json` backup.
+- Added coverage for legacy migration and shared application references.
+
 ## 0.1.0-alpha.1 — Release candidate
 
 - Added manual `cs2.exe` configuration with exact-path process tracking.

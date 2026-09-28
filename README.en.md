@@ -6,7 +6,7 @@
 
   <p>
     <img alt="Platform" src="https://img.shields.io/badge/platform-Windows%2010%2F11-66798d">
-    <img alt="Version" src="https://img.shields.io/badge/version-0.1.0--alpha.1-809bb7">
+    <img alt="Version" src="https://img.shields.io/badge/version-0.2.1--alpha.1-809bb7">
     <img alt=".NET" src="https://img.shields.io/badge/.NET-10.0-512bd4">
     <img alt="License" src="https://img.shields.io/badge/license-PolyForm%20Shield-555b66">
   </p>
@@ -26,9 +26,10 @@ Gaming often means closing background applications, starting the tools you need,
 3. KIT detects CS2, applies the Kit, and moves to the system tray.
 4. When the game ends, KIT restores the environment and records the session.
 
-## Alpha 0.1 features
+## Alpha 0.2 features
 
 - Multiple Kits plus a safe, immutable **Vanilla Kit**.
+- A shared **App Library**: each executable path is stored once and reused by every Kit.
 - **Clean Mode** fully closes selected applications, including tray processes.
 - **Launch Apps** starts selected applications with CS2.
 - Automatic **Restore** after the game and recovery after an interrupted KIT process.
@@ -46,7 +47,7 @@ The source is public for inspection. See [Trust and transparency](docs/TRANSPARE
 ## Install
 
 1. Open [Releases](https://github.com/sayaoff/KIT/releases/latest).
-2. Download `KIT-Alpha-0.1-RC1-win-x64.zip`.
+2. Download the latest portable archive for `win-x64`.
 3. Fully extract the archive and run `KIT.exe`.
 4. Select the installed Counter-Strike 2 `cs2.exe` from Home.
 
@@ -67,9 +68,9 @@ The Alpha is not commercially code-signed yet, so Microsoft SmartScreen may warn
 
 ## Roadmap
 
-The immediate goal is a stable Alpha 0.1: installer validation, clean Windows testing, and bug fixes. GPU/VRAM metrics, session charts, Deck, and safe `.kit` import/export can follow.
+Alpha 0.2 is being built in layers. Foundation moves applications into a shared library and migrates Alpha 0.1 data automatically while preserving `kits.v1.backup.json`. Typed Actions/Restore, expanded monitoring, Deck, and safe `.kit` import/export follow.
 
-FPS tracking, injection, memory reading, game-file modification, arbitrary scripts, Workshop/plugins, cloud features, and other games are outside the Alpha 0.1 scope.
+FPS tracking, injection, memory reading, game-file modification, arbitrary scripts, Workshop/plugins, cloud features, and other games remain outside the current scope.
 
 ## License
 
