@@ -22,8 +22,8 @@ public partial class MainWindow : Window
     private readonly WindowsStartupRegistration _startupRegistration;
     private readonly Forms.NotifyIcon _trayIcon;
     private readonly Drawing.Icon _appIcon;
-    private readonly List<ApplicationDefinition> _cleanApps = [];
-    private readonly List<ApplicationDefinition> _launchApps = [];
+    private readonly List<CleanActionRow> _cleanActions = [];
+    private readonly List<LaunchActionRow> _launchActions = [];
     private readonly List<ActivityEvent> _activity = [];
     private readonly List<SessionRecord> _sessions = [];
     private bool _reloadingCatalog;
@@ -34,6 +34,7 @@ public partial class MainWindow : Window
     private bool _startWithWindows;
     private bool _initializingAppearance;
     private bool _initializingStartupSetting;
+    private bool _loadingActionOptions;
     private bool _initializationStarted;
     private bool _startupComplete;
     private TrackingState? _previousTrackingState;
@@ -192,8 +193,8 @@ public partial class MainWindow : Window
         var updated = selected with
         {
             Name = KitNameText.Text,
-            CleanModeAppIds = _cleanApps.Select(application => application.Id).ToList(),
-            LaunchAppIds = _launchApps.Select(application => application.Id).ToList()
+            CleanModeActions = _cleanActions.Select(row => row.Action).ToList(),
+            LaunchAppActions = _launchActions.Select(row => row.Action).ToList()
         };
         await RunUiActionAsync(async () =>
         {
@@ -225,14 +226,23 @@ public partial class MainWindow : Window
     }
 
     private async void AddCleanApp_Click(object sender, RoutedEventArgs e) =>
-        await AddApplicationAsync(_cleanApps, CleanAppsList, isCleanMode: true);
+        await AddApplicationAsync(isCleanMode: true);
     private async void AddLaunchApp_Click(object sender, RoutedEventArgs e) =>
-        await AddApplicationAsync(_launchApps, LaunchAppsList, isCleanMode: false);
-    private void RemoveCleanApp_Click(object sender, RoutedEventArgs e) => RemoveApplication(_cleanApps, CleanAppsList);
-    private void RemoveLaunchApp_Click(object sender, RoutedEventArgs e) => RemoveApplication(_launchApps, LaunchAppsList);
+        await AddApplicationAsync(isCleanMode: false);
+    private void RemoveCleanApp_Click(object sender, RoutedEventArgs e)
+    {
+        if (CleanAppsList.SelectedItem is not CleanActionRow selected) return;
+        _cleanActions.Remove(selected);
+        RefreshActionLists();
+    }
+    private void RemoveLaunchApp_Click(object sender, RoutedEventArgs e)
+    {
+        if (LaunchAppsList.SelectedItem is not LaunchActionRow selected) return;
+        _launchActions.Remove(selected);
+        RefreshActionLists();
+    }
 
-    private async Task AddApplicationAsync(List<ApplicationDefinition> targets,
-        System.Windows.Controls.ListBox listBox, bool isCleanMode)
+    private async Task AddApplicationAsync(bool isCleanMode)
     {
         var dialog = new WpfOpenFileDialog
         {
@@ -249,44 +259,88 @@ public partial class MainWindow : Window
         }
         if (isCleanMode && WpfMessageBox.Show(this, S("CleanConfirm"), S("CleanConfirmTitle"),
                 MessageBoxButton.YesNo, MessageBoxImage.Warning) is not MessageBoxResult.Yes) return;
-        if (targets.Any(target => string.Equals(target.ExecutablePath, dialog.FileName, StringComparison.OrdinalIgnoreCase))) return;
+        if (isCleanMode && _cleanActions.Any(row =>
+                string.Equals(row.Application.ExecutablePath, dialog.FileName, StringComparison.OrdinalIgnoreCase))) return;
+        if (!isCleanMode && _launchActions.Any(row =>
+                string.Equals(row.Application.ExecutablePath, dialog.FileName, StringComparison.OrdinalIgnoreCase))) return;
 
-        var cleanIds = _cleanApps.Select(application => application.Id).ToList();
-        var launchIds = _launchApps.Select(application => application.Id).ToList();
+        var cleanActions = _cleanActions.Select(row => row.Action).ToList();
+        var launchActions = _launchActions.Select(row => row.Action).ToList();
         var pendingName = KitNameText.Text;
         await RunUiActionAsync(async () =>
         {
             var application = await _trackingService.RegisterApplicationAsync(
                 dialog.FileName, Path.GetFileNameWithoutExtension(dialog.FileName));
-            RestoreEditorApplications(cleanIds, launchIds);
+            RestoreEditorActions(cleanActions, launchActions);
             KitNameText.Text = pendingName;
-            if (targets.All(candidate => candidate.Id != application.Id)) targets.Add(application);
-            RefreshTargetList(listBox, targets);
+            if (isCleanMode && _cleanActions.All(row => row.Application.Id != application.Id))
+                _cleanActions.Add(CreateCleanRow(application,
+                    new CleanModeAction(application.Id, CleanCloseMode.ForceIfNeeded, 0, true)));
+            else if (!isCleanMode && _launchActions.All(row => row.Application.Id != application.Id))
+                _launchActions.Add(CreateLaunchRow(application, new LaunchAppAction(application.Id, 0, true)));
+            RefreshActionLists();
         }, S("ErrorAppLibrary"));
     }
 
-    private static void RemoveApplication(List<ApplicationDefinition> targets, System.Windows.Controls.ListBox listBox)
+    private void CleanAppsList_SelectionChanged(object sender,
+        System.Windows.Controls.SelectionChangedEventArgs e)
     {
-        if (listBox.SelectedItem is not ApplicationDefinition selected) return;
-        targets.Remove(selected);
-        RefreshTargetList(listBox, targets);
+        _loadingActionOptions = true;
+        if (CleanAppsList.SelectedItem is CleanActionRow selected)
+        {
+            CleanCloseModeSelector.SelectedIndex = selected.Action.CloseMode is CleanCloseMode.Normal ? 0 : 1;
+            CleanDelaySelector.SelectedIndex = DelayToIndex(selected.Action.DelaySeconds);
+            RestoreCleanAppToggle.IsChecked = selected.Action.RestoreAfterSession;
+        }
+        _loadingActionOptions = false;
+        UpdateActionEditorAvailability();
     }
 
-    private static void RefreshTargetList(System.Windows.Controls.ListBox listBox, List<ApplicationDefinition> targets)
+    private void LaunchAppsList_SelectionChanged(object sender,
+        System.Windows.Controls.SelectionChangedEventArgs e)
     {
-        listBox.ItemsSource = null;
-        listBox.ItemsSource = targets;
+        _loadingActionOptions = true;
+        if (LaunchAppsList.SelectedItem is LaunchActionRow selected)
+        {
+            LaunchDelaySelector.SelectedIndex = DelayToIndex(selected.Action.DelaySeconds);
+            CloseLaunchedAppToggle.IsChecked = selected.Action.CloseAfterSession;
+        }
+        _loadingActionOptions = false;
+        UpdateActionEditorAvailability();
+    }
+
+    private void CleanActionOption_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_loadingActionOptions || CleanAppsList.SelectedItem is not CleanActionRow selected) return;
+        var updated = selected.Action with
+        {
+            CloseMode = CleanCloseModeSelector.SelectedIndex == 0
+                ? CleanCloseMode.Normal : CleanCloseMode.ForceIfNeeded,
+            DelaySeconds = IndexToDelay(CleanDelaySelector.SelectedIndex),
+            RestoreAfterSession = RestoreCleanAppToggle.IsChecked is true
+        };
+        var index = _cleanActions.IndexOf(selected);
+        _cleanActions[index] = CreateCleanRow(selected.Application, updated);
+        RefreshActionLists(index, null);
+    }
+
+    private void LaunchActionOption_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_loadingActionOptions || LaunchAppsList.SelectedItem is not LaunchActionRow selected) return;
+        var updated = selected.Action with
+        {
+            DelaySeconds = IndexToDelay(LaunchDelaySelector.SelectedIndex),
+            CloseAfterSession = CloseLaunchedAppToggle.IsChecked is true
+        };
+        var index = _launchActions.IndexOf(selected);
+        _launchActions[index] = CreateLaunchRow(selected.Application, updated);
+        RefreshActionLists(null, index);
     }
 
     private void LoadKitEditor(KitDefinition kit)
     {
         KitNameText.Text = kit.Name;
-        _cleanApps.Clear();
-        _cleanApps.AddRange(_trackingService.ResolveApplications(kit.CleanModeAppIds));
-        _launchApps.Clear();
-        _launchApps.AddRange(_trackingService.ResolveApplications(kit.LaunchAppIds));
-        RefreshTargetList(CleanAppsList, _cleanApps);
-        RefreshTargetList(LaunchAppsList, _launchApps);
+        RestoreEditorActions(kit.CleanModeActions, kit.LaunchAppActions);
         var editable = !kit.IsVanilla && !_trackingService.IsGameRunning;
         KitNameText.IsEnabled = editable;
         SaveKitButton.IsEnabled = editable;
@@ -296,17 +350,58 @@ public partial class MainWindow : Window
         AddLaunchButton.IsEnabled = editable;
         RemoveLaunchButton.IsEnabled = editable;
         ActivateKitButton.IsEnabled = !_trackingService.IsGameRunning && kit.Id != _trackingService.Catalog.ActiveKitId;
+        UpdateActionEditorAvailability();
     }
 
-    private void RestoreEditorApplications(IEnumerable<Guid> cleanIds, IEnumerable<Guid> launchIds)
+    private void RestoreEditorActions(IEnumerable<CleanModeAction> cleanActions,
+        IEnumerable<LaunchAppAction> launchActions)
     {
-        _cleanApps.Clear();
-        _cleanApps.AddRange(_trackingService.ResolveApplications(cleanIds));
-        _launchApps.Clear();
-        _launchApps.AddRange(_trackingService.ResolveApplications(launchIds));
-        RefreshTargetList(CleanAppsList, _cleanApps);
-        RefreshTargetList(LaunchAppsList, _launchApps);
+        var applications = _trackingService.Catalog.Applications.ToDictionary(application => application.Id);
+        _cleanActions.Clear();
+        _cleanActions.AddRange(cleanActions.Where(action => applications.ContainsKey(action.ApplicationId))
+            .Select(action => CreateCleanRow(applications[action.ApplicationId], action)));
+        _launchActions.Clear();
+        _launchActions.AddRange(launchActions.Where(action => applications.ContainsKey(action.ApplicationId))
+            .Select(action => CreateLaunchRow(applications[action.ApplicationId], action)));
+        RefreshActionLists();
     }
+
+    private void RefreshActionLists(int? cleanSelection = null, int? launchSelection = null)
+    {
+        CleanAppsList.ItemsSource = null;
+        CleanAppsList.ItemsSource = _cleanActions;
+        if (cleanSelection is >= 0 && cleanSelection < _cleanActions.Count)
+            CleanAppsList.SelectedIndex = cleanSelection.Value;
+        LaunchAppsList.ItemsSource = null;
+        LaunchAppsList.ItemsSource = _launchActions;
+        if (launchSelection is >= 0 && launchSelection < _launchActions.Count)
+            LaunchAppsList.SelectedIndex = launchSelection.Value;
+        UpdateActionEditorAvailability();
+    }
+
+    private void UpdateActionEditorAvailability()
+    {
+        var editable = KitSelector.SelectedItem is KitDefinition { IsVanilla: false } &&
+                       !_trackingService.IsGameRunning;
+        CleanActionOptions.IsEnabled = editable && CleanAppsList.SelectedItem is CleanActionRow;
+        LaunchActionOptions.IsEnabled = editable && LaunchAppsList.SelectedItem is LaunchActionRow;
+    }
+
+    private static int DelayToIndex(int seconds) => seconds switch { 5 => 1, 10 => 2, _ => 0 };
+    private static int IndexToDelay(int index) => index switch { 1 => 5, 2 => 10, _ => 0 };
+
+    private static CleanActionRow CreateCleanRow(ApplicationDefinition application, CleanModeAction action) =>
+        new(application, action, string.Format(S("CleanActionSummary"),
+            action.CloseMode is CleanCloseMode.Normal ? S("CloseNormal") : S("CloseForce"),
+            FormatDelay(action.DelaySeconds), action.RestoreAfterSession ? S("Yes") : S("No")));
+
+    private static LaunchActionRow CreateLaunchRow(ApplicationDefinition application, LaunchAppAction action) =>
+        new(application, action, string.Format(S("LaunchActionSummary"),
+            FormatDelay(action.DelaySeconds), action.CloseAfterSession ? S("Yes") : S("No")));
+
+    private static string FormatDelay(int seconds) => seconds == 0
+        ? S("Immediately")
+        : string.Format(S("SecondsFormat"), seconds);
 
     private void ReloadCatalog(Guid selectedKitId)
     {
@@ -422,7 +517,7 @@ public partial class MainWindow : Window
         var kit = _trackingService.ActiveKit;
         HomeActiveKitNameText.Text = kit.Name;
         HomeKitSummaryText.Text = string.Format(S("KitActionsSummary"),
-            kit.CleanModeAppIds.Count, kit.LaunchAppIds.Count);
+            kit.CleanModeActions.Count, kit.LaunchAppActions.Count);
         HomeGameStateText.Text = _lastStatus is null ? S("StatusStarting") : FormatStatus(_lastStatus);
 
         var last = _sessions.OrderByDescending(session => session.EndedAtUtc).FirstOrDefault();
@@ -457,7 +552,7 @@ public partial class MainWindow : Window
 
     private string FormatActivityDetail(ActivityEvent activity)
     {
-        if (activity.Kind is ActivityEventKind.ActionWarning && !string.IsNullOrWhiteSpace(activity.Details))
+        if (!string.IsNullOrWhiteSpace(activity.Details))
             return activity.Details;
         var kit = activity.KitName ?? _trackingService.ActiveKit.Name;
         return activity.Duration is null ? kit : $"{kit} · {FormatDuration(activity.Duration.Value)}";
@@ -504,6 +599,8 @@ public partial class MainWindow : Window
         RenderActivity();
         RenderSessions();
         RenderDashboard();
+        RestoreEditorActions(_cleanActions.Select(row => row.Action).ToList(),
+            _launchActions.Select(row => row.Action).ToList());
         LiveMetricsText.Text = _lastResourceSample is null
             ? S("MonitoringIdle")
             : string.Format(S("LiveMetricsFormat"), _lastResourceSample.CpuPercent,
@@ -684,4 +781,12 @@ public partial class MainWindow : Window
     private sealed record SessionRow(string Date, string Kit, string Duration,
         string AverageCpu, string PeakCpu, string AverageRam, string PeakRam);
     private sealed record ActivityRow(string Title, string Detail, string Time);
+    private sealed record CleanActionRow(ApplicationDefinition Application, CleanModeAction Action, string Summary)
+    {
+        public string DisplayName => Application.DisplayName;
+    }
+    private sealed record LaunchActionRow(ApplicationDefinition Application, LaunchAppAction Action, string Summary)
+    {
+        public string DisplayName => Application.DisplayName;
+    }
 }

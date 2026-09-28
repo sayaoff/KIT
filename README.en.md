@@ -6,7 +6,7 @@
 
   <p>
     <img alt="Platform" src="https://img.shields.io/badge/platform-Windows%2010%2F11-66798d">
-    <img alt="Version" src="https://img.shields.io/badge/version-0.2.1--alpha.1-809bb7">
+    <img alt="Version" src="https://img.shields.io/badge/version-0.2.2--alpha.1-809bb7">
     <img alt=".NET" src="https://img.shields.io/badge/.NET-10.0-512bd4">
     <img alt="License" src="https://img.shields.io/badge/license-PolyForm%20Shield-555b66">
   </p>
@@ -30,6 +30,8 @@ Gaming often means closing background applications, starting the tools you need,
 
 - Multiple Kits plus a safe, immutable **Vanilla Kit**.
 - A shared **App Library**: each executable path is stored once and reused by every Kit.
+- A **Before → During → After** editor that exposes the complete Kit lifecycle.
+- Per-application close mode, delay, and post-session behavior.
 - **Clean Mode** fully closes selected applications, including tray processes.
 - **Launch Apps** starts selected applications with CS2.
 - Automatic **Restore** after the game and recovery after an interrupted KIT process.
@@ -68,7 +70,7 @@ The Alpha is not commercially code-signed yet, so Microsoft SmartScreen may warn
 
 ## Roadmap
 
-Alpha 0.2 is being built in layers. Foundation moves applications into a shared library and migrates Alpha 0.1 data automatically while preserving `kits.v1.backup.json`. Typed Actions/Restore, expanded monitoring, Deck, and safe `.kit` import/export follow.
+Alpha 0.2 is being built in layers. Foundation and Actions now provide a shared App Library and a controllable Before/During/After lifecycle. Expanded monitoring, Deck, and safe `.kit` import/export follow.
 
 FPS tracking, injection, memory reading, game-file modification, arbitrary scripts, Workshop/plugins, cloud features, and other games remain outside the current scope.
 

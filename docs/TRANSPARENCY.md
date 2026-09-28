@@ -7,6 +7,7 @@ KIT publishes its source so users can inspect what the Windows build does and bu
 - The exact `cs2.exe` path explicitly selected by the user.
 - Standard Windows process information needed to detect that executable and read its CPU/RAM usage.
 - Applications explicitly selected for Clean Mode or Launch Apps.
+- User-selected close mode, delay, and post-session behavior for each Kit action.
 - `%LOCALAPPDATA%\KIT` for configuration, Kits, recovery state, session history, and diagnostics.
 - `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, only when the user enables Windows startup.
 
@@ -17,6 +18,8 @@ KIT publishes its source so users can inspect what the Windows build does and bu
 - No telemetry, analytics, accounts, cloud synchronization, or network communication.
 - No arbitrary scripts, plugins, or Workshop content.
 - No permanent administrator rights. The installer is per-user.
+
+Normal close only sends the standard Windows close request and never terminates the process. Force-if-needed waits two seconds after that request before terminating the remaining process tree. Delayed actions are limited to declarative settings; KIT does not execute user-provided commands or scripts.
 
 ## Verify a release
 

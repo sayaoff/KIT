@@ -1,5 +1,5 @@
 #define MyAppName "KIT"
-#define MyAppVersion "0.2.1-alpha.1"
+#define MyAppVersion "0.2.2-alpha.1"
 #define MyAppPublisher "KIT Project"
 #define MyAppExeName "KIT.exe"
 
@@ -15,7 +15,7 @@ PrivilegesRequired=lowest
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 OutputDir=..\artifacts\installer
-OutputBaseFilename=KIT-Alpha-0.2.1-Foundation-Setup-x64
+OutputBaseFilename=KIT-Alpha-0.2.2-Actions-Setup-x64
 SetupIconFile=..\src\KIT.App\Assets\KIT.ico
 Compression=lzma2
 SolidCompression=yes

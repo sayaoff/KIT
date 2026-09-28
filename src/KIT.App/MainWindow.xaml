@@ -93,7 +93,7 @@
                 </Grid.RowDefinitions>
                 <StackPanel Margin="12,0">
                     <TextBlock Text="KIT" FontSize="25" FontWeight="SemiBold" />
-                    <TextBlock Text="ALPHA 0.2.1 · FOUNDATION" Margin="1,2,0,0" FontSize="10" FontWeight="SemiBold"
+                    <TextBlock Text="ALPHA 0.2.2 · ACTIONS" Margin="1,2,0,0" FontSize="10" FontWeight="SemiBold"
                                Foreground="{DynamicResource SecondaryText}" />
                 </StackPanel>
 
@@ -247,37 +247,117 @@
                                 <Button x:Name="DeleteKitButton" Content="{DynamicResource Delete}" Click="DeleteKit_Click" Padding="12,7" />
                             </StackPanel>
                         </Grid>
-                        <Grid Grid.Row="2">
-                            <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="16"/><ColumnDefinition/></Grid.ColumnDefinitions>
-                            <Border Style="{StaticResource SectionCard}" Margin="0,0,0,16">
+                        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+                            <StackPanel>
+                                <TextBlock Text="{DynamicResource BeforePhase}" FontSize="11" FontWeight="Bold"
+                                           Foreground="{DynamicResource Accent}" Margin="2,0,0,8" />
                                 <Grid>
-                                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="12"/><RowDefinition Height="*"/><RowDefinition Height="12"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-                                    <TextBlock Text="{DynamicResource CleanMode}" FontSize="16" FontWeight="SemiBold" />
-                                    <TextBlock Grid.Row="1" Margin="0,5,0,0" TextWrapping="Wrap" FontSize="12"
-                                               Foreground="{DynamicResource SecondaryText}" Text="{DynamicResource CleanDescription}" />
-                                    <ListBox Grid.Row="3" x:Name="CleanAppsList" DisplayMemberPath="DisplayName"
-                                             Background="{DynamicResource InsetBackground}" Foreground="{DynamicResource PrimaryText}" BorderThickness="0" />
-                                    <StackPanel Grid.Row="5" Orientation="Horizontal">
-                                        <Button x:Name="AddCleanButton" Content="{DynamicResource AddExe}" Click="AddCleanApp_Click" Padding="11,6" Margin="0,0,6,0" />
-                                        <Button x:Name="RemoveCleanButton" Content="{DynamicResource Remove}" Click="RemoveCleanApp_Click" Padding="11,6" />
-                                    </StackPanel>
+                                    <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="16"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                                    <Border Style="{StaticResource SectionCard}">
+                                        <StackPanel>
+                                            <TextBlock Text="{DynamicResource CleanMode}" FontSize="16" FontWeight="SemiBold" />
+                                            <TextBlock Margin="0,5,0,12" TextWrapping="Wrap" FontSize="12"
+                                                       Foreground="{DynamicResource SecondaryText}" Text="{DynamicResource CleanDescriptionV2}" />
+                                            <ListBox x:Name="CleanAppsList" Height="150" SelectionChanged="CleanAppsList_SelectionChanged"
+                                                     Background="{DynamicResource InsetBackground}" Foreground="{DynamicResource PrimaryText}" BorderThickness="0">
+                                                <ListBox.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <StackPanel Margin="8,5">
+                                                            <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" />
+                                                            <TextBlock Text="{Binding Summary}" Margin="0,2,0,0" FontSize="11"
+                                                                       Foreground="{DynamicResource SecondaryText}" />
+                                                        </StackPanel>
+                                                    </DataTemplate>
+                                                </ListBox.ItemTemplate>
+                                            </ListBox>
+                                            <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                                                <Button x:Name="AddCleanButton" Content="{DynamicResource AddExe}" Click="AddCleanApp_Click" Padding="11,6" Margin="0,0,6,0" />
+                                                <Button x:Name="RemoveCleanButton" Content="{DynamicResource Remove}" Click="RemoveCleanApp_Click" Padding="11,6" />
+                                            </StackPanel>
+                                            <Grid x:Name="CleanActionOptions" Margin="0,14,0,0">
+                                                <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="12"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                                                <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="8"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                                                <StackPanel>
+                                                    <TextBlock Text="{DynamicResource CloseMode}" FontSize="11" Foreground="{DynamicResource SecondaryText}" />
+                                                    <ComboBox x:Name="CleanCloseModeSelector" Margin="0,5,0,0" SelectionChanged="CleanActionOption_Changed">
+                                                        <ComboBoxItem Content="{DynamicResource CloseNormal}" />
+                                                        <ComboBoxItem Content="{DynamicResource CloseForce}" />
+                                                    </ComboBox>
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="2">
+                                                    <TextBlock Text="{DynamicResource Delay}" FontSize="11" Foreground="{DynamicResource SecondaryText}" />
+                                                    <ComboBox x:Name="CleanDelaySelector" Margin="0,5,0,0" SelectionChanged="CleanActionOption_Changed">
+                                                        <ComboBoxItem Content="{DynamicResource Immediately}" />
+                                                        <ComboBoxItem Content="5 sec" />
+                                                        <ComboBoxItem Content="10 sec" />
+                                                    </ComboBox>
+                                                </StackPanel>
+                                                <CheckBox Grid.Row="2" Grid.ColumnSpan="3" x:Name="RestoreCleanAppToggle"
+                                                          Content="{DynamicResource RestoreAfterSession}" Checked="CleanActionOption_Changed"
+                                                          Unchecked="CleanActionOption_Changed" Foreground="{DynamicResource PrimaryText}" />
+                                            </Grid>
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Grid.Column="2" Style="{StaticResource SectionCard}">
+                                        <StackPanel>
+                                            <TextBlock Text="{DynamicResource LaunchApps}" FontSize="16" FontWeight="SemiBold" />
+                                            <TextBlock Margin="0,5,0,12" TextWrapping="Wrap" FontSize="12"
+                                                       Foreground="{DynamicResource SecondaryText}" Text="{DynamicResource LaunchDescriptionV2}" />
+                                            <ListBox x:Name="LaunchAppsList" Height="150" SelectionChanged="LaunchAppsList_SelectionChanged"
+                                                     Background="{DynamicResource InsetBackground}" Foreground="{DynamicResource PrimaryText}" BorderThickness="0">
+                                                <ListBox.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <StackPanel Margin="8,5">
+                                                            <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" />
+                                                            <TextBlock Text="{Binding Summary}" Margin="0,2,0,0" FontSize="11"
+                                                                       Foreground="{DynamicResource SecondaryText}" />
+                                                        </StackPanel>
+                                                    </DataTemplate>
+                                                </ListBox.ItemTemplate>
+                                            </ListBox>
+                                            <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                                                <Button x:Name="AddLaunchButton" Content="{DynamicResource AddExe}" Click="AddLaunchApp_Click" Padding="11,6" Margin="0,0,6,0" />
+                                                <Button x:Name="RemoveLaunchButton" Content="{DynamicResource Remove}" Click="RemoveLaunchApp_Click" Padding="11,6" />
+                                            </StackPanel>
+                                            <Grid x:Name="LaunchActionOptions" Margin="0,14,0,0">
+                                                <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="8"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                                                <StackPanel>
+                                                    <TextBlock Text="{DynamicResource Delay}" FontSize="11" Foreground="{DynamicResource SecondaryText}" />
+                                                    <ComboBox x:Name="LaunchDelaySelector" Margin="0,5,0,0" SelectionChanged="LaunchActionOption_Changed">
+                                                        <ComboBoxItem Content="{DynamicResource Immediately}" />
+                                                        <ComboBoxItem Content="5 sec" />
+                                                        <ComboBoxItem Content="10 sec" />
+                                                    </ComboBox>
+                                                </StackPanel>
+                                                <CheckBox Grid.Row="2" x:Name="CloseLaunchedAppToggle"
+                                                          Content="{DynamicResource CloseAfterSession}" Checked="LaunchActionOption_Changed"
+                                                          Unchecked="LaunchActionOption_Changed" Foreground="{DynamicResource PrimaryText}" />
+                                            </Grid>
+                                        </StackPanel>
+                                    </Border>
                                 </Grid>
-                            </Border>
-                            <Border Grid.Column="2" Style="{StaticResource SectionCard}">
-                                <Grid>
-                                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="12"/><RowDefinition Height="*"/><RowDefinition Height="12"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-                                    <TextBlock Text="{DynamicResource LaunchApps}" FontSize="16" FontWeight="SemiBold" />
-                                    <TextBlock Grid.Row="1" Margin="0,5,0,0" TextWrapping="Wrap" FontSize="12"
-                                               Foreground="{DynamicResource SecondaryText}" Text="{DynamicResource LaunchDescription}" />
-                                    <ListBox Grid.Row="3" x:Name="LaunchAppsList" DisplayMemberPath="DisplayName"
-                                             Background="{DynamicResource InsetBackground}" Foreground="{DynamicResource PrimaryText}" BorderThickness="0" />
-                                    <StackPanel Grid.Row="5" Orientation="Horizontal">
-                                        <Button x:Name="AddLaunchButton" Content="{DynamicResource AddExe}" Click="AddLaunchApp_Click" Padding="11,6" Margin="0,0,6,0" />
-                                        <Button x:Name="RemoveLaunchButton" Content="{DynamicResource Remove}" Click="RemoveLaunchApp_Click" Padding="11,6" />
+
+                                <TextBlock Text="{DynamicResource DuringPhase}" FontSize="11" FontWeight="Bold"
+                                           Foreground="{DynamicResource Accent}" Margin="2,18,0,8" />
+                                <Border Style="{StaticResource SectionCard}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="●" Foreground="{DynamicResource Accent}" Margin="0,0,10,0" />
+                                        <StackPanel>
+                                            <TextBlock Text="{DynamicResource SessionMonitoring}" FontWeight="SemiBold" />
+                                            <TextBlock Text="{DynamicResource SessionMonitoringDescription}" Margin="0,4,0,0"
+                                                       Foreground="{DynamicResource SecondaryText}" />
+                                        </StackPanel>
                                     </StackPanel>
-                                </Grid>
-                            </Border>
-                        </Grid>
+                                </Border>
+
+                                <TextBlock Text="{DynamicResource AfterPhase}" FontSize="11" FontWeight="Bold"
+                                           Foreground="{DynamicResource Accent}" Margin="2,18,0,8" />
+                                <Border Style="{StaticResource SectionCard}" Margin="0,0,0,16">
+                                    <TextBlock Text="{DynamicResource AfterPhaseDescription}" TextWrapping="Wrap"
+                                               Foreground="{DynamicResource SecondaryText}" />
+                                </Border>
+                            </StackPanel>
+                        </ScrollViewer>
                     </Grid>
                 </TabItem>
 

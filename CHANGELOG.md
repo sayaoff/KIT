@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.2-alpha.1 — Actions
+
+- Rebuilt the Kit Editor around the Before / During / After session lifecycle.
+- Added per-application Normal and Force-if-needed Clean Mode behavior.
+- Added independent 0, 5, and 10 second delays for Clean Mode and Launch Apps.
+- Added per-application Restore after session and Close after session controls.
+- Persist recovery state after every completed action so interrupted delayed sequences remain recoverable.
+- Added automatic migration from the 0.2.1 Foundation schema with a one-time backup.
+
 ## 0.2.1-alpha.1 — Foundation
 
 - Added a shared App Library for executables used by Kits.

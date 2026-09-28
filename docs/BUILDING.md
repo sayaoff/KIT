@@ -41,6 +41,7 @@ KIT stores user data in `%LOCALAPPDATA%\KIT`:
 - `configuration.json` — selected `cs2.exe`;
 - `kits.json` — App Library, Kits, and the Active Kit;
 - `kits.v1.backup.json` — one-time backup created when Alpha 0.1 Kit data is migrated;
+- `kits.v2.backup.json` — one-time backup created when Alpha 0.2.1 Foundation data is migrated;
 - `active-session.json` — crash-recovery state;
 - `preferences.json` — language, appearance, and Windows startup preference;
 - `activity.jsonl` — events and warnings;

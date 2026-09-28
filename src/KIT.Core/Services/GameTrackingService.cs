@@ -118,11 +118,12 @@ public sealed class GameTrackingService : IAsyncDisposable
         {
             Name = normalizedName,
             IsVanilla = false,
-            CleanModeAppIds = NormalizeApplicationIds(kit.CleanModeAppIds),
-            LaunchAppIds = NormalizeApplicationIds(kit.LaunchAppIds)
+            CleanModeActions = NormalizeCleanActions(kit.CleanModeActions),
+            LaunchAppActions = NormalizeLaunchActions(kit.LaunchAppActions)
         };
         if (Configuration is not null && ResolveApplications(
-                normalized.CleanModeAppIds.Concat(normalized.LaunchAppIds))
+                normalized.CleanModeActions.Select(action => action.ApplicationId)
+                    .Concat(normalized.LaunchAppActions.Select(action => action.ApplicationId)))
                 .Any(target => string.Equals(target.ExecutablePath, Configuration.ExecutablePath,
                     StringComparison.OrdinalIgnoreCase)))
             throw new InvalidOperationException("cs2.exe cannot be used as a Kit action target.");
@@ -187,8 +188,8 @@ public sealed class GameTrackingService : IAsyncDisposable
             Applications = Catalog.Applications.Where(application => application.Id != applicationId).ToList(),
             Kits = Catalog.Kits.Select(kit => kit with
             {
-                CleanModeAppIds = kit.CleanModeAppIds.Where(id => id != applicationId).ToList(),
-                LaunchAppIds = kit.LaunchAppIds.Where(id => id != applicationId).ToList()
+                CleanModeActions = kit.CleanModeActions.Where(action => action.ApplicationId != applicationId).ToList(),
+                LaunchAppActions = kit.LaunchAppActions.Where(action => action.ApplicationId != applicationId).ToList()
             }).ToList()
         };
         await SaveCatalogAsync(cancellationToken);
@@ -286,12 +287,20 @@ public sealed class GameTrackingService : IAsyncDisposable
         await _recoveryRepository.SaveAsync(new SessionRecoveryState(_currentSession, emptyState), cancellationToken);
         try
         {
-            var result = await _actionCoordinator.ApplyAsync(CreateExecutionPlan(kit), _clock.UtcNow, cancellationToken);
+            var result = await _actionCoordinator.ApplyAsync(CreateExecutionPlan(kit), _clock.UtcNow,
+                async (state, stateCancellationToken) =>
+                {
+                    _appliedKit = state;
+                    await _recoveryRepository.SaveAsync(
+                        new SessionRecoveryState(_currentSession, state), stateCancellationToken);
+                }, cancellationToken);
             _appliedKit = result.State;
             await _recoveryRepository.SaveAsync(new SessionRecoveryState(_currentSession, result.State), cancellationToken);
             await RecordAsync(new ActivityEvent(Guid.NewGuid(), _currentSession.Id, ActivityEventKind.KitApplied,
                 _clock.UtcNow, change.ProcessId, change.ExecutablePath, KitId: kit.Id, KitName: kit.Name,
-                Details: $"Closed {result.State.ClosedApplications.Count}; launched {result.State.LaunchedApplications.Count}."), cancellationToken);
+                Details: $"Before: closed {result.State.ClosedApplications.Count}; launched {result.State.LaunchedApplications.Count}. " +
+                         $"After: restore {result.State.ClosedApplications.Count(application => application.RestoreAfterSession)}; " +
+                         $"close {result.State.LaunchedApplications.Count(application => application.CloseAfterSession)}."), cancellationToken);
             await RecordWarningsAsync(result.Warnings, _currentSession, kit, cancellationToken);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
@@ -340,7 +349,9 @@ public sealed class GameTrackingService : IAsyncDisposable
             {
                 var restore = await _actionCoordinator.RestoreAsync(_appliedKit, cancellationToken);
                 await RecordAsync(new ActivityEvent(Guid.NewGuid(), session.Id, ActivityEventKind.KitRestored,
-                    _clock.UtcNow, session.ProcessId, session.ExecutablePath, KitId: kit.Id, KitName: kit.Name), cancellationToken);
+                    _clock.UtcNow, session.ProcessId, session.ExecutablePath, KitId: kit.Id, KitName: kit.Name,
+                    Details: $"Restored {_appliedKit.ClosedApplications.Count(application => application.RestoreAfterSession)}; " +
+                             $"closed {_appliedKit.LaunchedApplications.Count(application => application.CloseAfterSession)}."), cancellationToken);
                 await RecordWarningsAsync(restore.Warnings, session, kit, cancellationToken);
                 await _recoveryRepository.ClearAsync(cancellationToken);
             }
@@ -435,8 +446,14 @@ public sealed class GameTrackingService : IAsyncDisposable
         var validApplicationIds = applications.Select(application => application.Id).ToHashSet();
         var kits = (catalog.Kits ?? []).Where(kit => !kit.IsVanilla).Select(kit => kit with
         {
-            CleanModeAppIds = (kit.CleanModeAppIds ?? []).Where(validApplicationIds.Contains).Distinct().ToList(),
-            LaunchAppIds = (kit.LaunchAppIds ?? []).Where(validApplicationIds.Contains).Distinct().ToList()
+            CleanModeActions = (kit.CleanModeActions ?? [])
+                .Where(action => validApplicationIds.Contains(action.ApplicationId))
+                .DistinctBy(action => action.ApplicationId)
+                .Select(NormalizeCleanAction).ToList(),
+            LaunchAppActions = (kit.LaunchAppActions ?? [])
+                .Where(action => validApplicationIds.Contains(action.ApplicationId))
+                .DistinctBy(action => action.ApplicationId)
+                .Select(NormalizeLaunchAction).ToList()
         }).ToList();
         kits.Insert(0, KitCatalog.CreateDefault().Kits[0]);
         var activeId = kits.Any(kit => kit.Id == catalog.ActiveKitId) ? catalog.ActiveKitId : KitCatalog.VanillaKitId;
@@ -457,17 +474,44 @@ public sealed class GameTrackingService : IAsyncDisposable
             throw new InvalidOperationException("A Kit with this name already exists.");
     }
 
-    private List<Guid> NormalizeApplicationIds(IEnumerable<Guid> applicationIds)
+    private List<CleanModeAction> NormalizeCleanActions(IEnumerable<CleanModeAction> actions)
     {
         var validIds = Catalog.Applications.Select(application => application.Id).ToHashSet();
-        return applicationIds.Where(validIds.Contains).Distinct().ToList();
+        return actions.Where(action => validIds.Contains(action.ApplicationId))
+            .DistinctBy(action => action.ApplicationId).Select(NormalizeCleanAction).ToList();
     }
 
-    private KitExecutionPlan CreateExecutionPlan(KitDefinition kit) => new(
-        kit.Id,
-        kit.Name,
-        ResolveApplications(kit.CleanModeAppIds),
-        ResolveApplications(kit.LaunchAppIds));
+    private List<LaunchAppAction> NormalizeLaunchActions(IEnumerable<LaunchAppAction> actions)
+    {
+        var validIds = Catalog.Applications.Select(application => application.Id).ToHashSet();
+        return actions.Where(action => validIds.Contains(action.ApplicationId))
+            .DistinctBy(action => action.ApplicationId).Select(NormalizeLaunchAction).ToList();
+    }
+
+    private static CleanModeAction NormalizeCleanAction(CleanModeAction action) => action with
+    {
+        CloseMode = Enum.IsDefined(action.CloseMode) ? action.CloseMode : CleanCloseMode.ForceIfNeeded,
+        DelaySeconds = Math.Clamp(action.DelaySeconds, 0, 60)
+    };
+
+    private static LaunchAppAction NormalizeLaunchAction(LaunchAppAction action) => action with
+    {
+        DelaySeconds = Math.Clamp(action.DelaySeconds, 0, 60)
+    };
+
+    private KitExecutionPlan CreateExecutionPlan(KitDefinition kit)
+    {
+        var applications = Catalog.Applications.ToDictionary(application => application.Id);
+        return new KitExecutionPlan(
+            kit.Id,
+            kit.Name,
+            kit.CleanModeActions.Where(action => applications.ContainsKey(action.ApplicationId))
+                .Select(action => new CleanModeExecution(applications[action.ApplicationId], action.CloseMode,
+                    action.DelaySeconds, action.RestoreAfterSession)).ToList(),
+            kit.LaunchAppActions.Where(action => applications.ContainsKey(action.ApplicationId))
+                .Select(action => new LaunchAppExecution(applications[action.ApplicationId], action.DelaySeconds,
+                    action.CloseAfterSession)).ToList());
+    }
 
     private string ValidateApplicationPath(string executablePath)
     {

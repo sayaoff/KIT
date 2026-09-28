@@ -6,7 +6,7 @@
 
   <p>
     <img alt="Platform" src="https://img.shields.io/badge/platform-Windows%2010%2F11-66798d">
-    <img alt="Version" src="https://img.shields.io/badge/version-0.2.1--alpha.1-809bb7">
+    <img alt="Version" src="https://img.shields.io/badge/version-0.2.2--alpha.1-809bb7">
     <img alt=".NET" src="https://img.shields.io/badge/.NET-10.0-512bd4">
     <img alt="License" src="https://img.shields.io/badge/license-PolyForm%20Shield-555b66">
   </p>
@@ -30,6 +30,8 @@
 
 - Несколько Kits и безопасный неизменяемый **Vanilla Kit**.
 - Общая **Библиотека приложений**: путь к программе хранится один раз и используется во всех Kits.
+- Редактор **До игры → Во время игры → После игры**, показывающий полный жизненный цикл Kit.
+- Для каждого приложения: обычное или принудительное закрытие, задержка и отдельное поведение после сессии.
 - **Clean Mode** — полное завершение выбранных приложений, включая процессы в трее.
 - **Launch Apps** — запуск выбранных приложений вместе с CS2.
 - Автоматический **Restore** после игры и восстановление после аварийного завершения KIT.
@@ -77,7 +79,7 @@ Alpha пока не подписана коммерческим сертифик
 
 ## Дальше
 
-Alpha 0.2 развивается по слоям. Foundation уже переводит приложения в общую библиотеку и автоматически переносит данные Alpha 0.1, сохраняя `kits.v1.backup.json`. Следующие этапы: типизированные Actions/Restore, расширенный мониторинг, Deck и безопасный import/export `.kit`.
+Alpha 0.2 развивается по слоям. Foundation и Actions уже дают общую библиотеку приложений и управляемый жизненный цикл Before/During/After. Следующие этапы: расширенный мониторинг, Deck и безопасный import/export `.kit`.
 
 FPS, injection, memory reading, изменение файлов игры, arbitrary scripts, Workshop/plugins, cloud и другие игры не входят в текущий scope.
 

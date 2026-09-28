@@ -23,16 +23,42 @@ public sealed class JsonKitRepository : IKitRepository
                 throw new NotSupportedException($"kits.json schema {version} is newer than this KIT version supports.");
             if (version == KitCatalog.CurrentSchemaVersion)
                 return document.RootElement.Deserialize<KitCatalog>(Options);
+            if (version == 2)
+            {
+                var versionTwo = document.RootElement.Deserialize<VersionTwoKitCatalog>(Options);
+                if (versionTwo is null) return null;
+                CreateBackup(_paths.KitsV2BackupFile);
+                return MigrateVersionTwo(versionTwo);
+            }
         }
 
         var legacy = document.RootElement.Deserialize<LegacyKitCatalog>(Options);
         if (legacy is null) return null;
-        if (!File.Exists(_paths.KitsV1BackupFile)) File.Copy(_paths.KitsFile, _paths.KitsV1BackupFile);
+        CreateBackup(_paths.KitsV1BackupFile);
         return MigrateLegacy(legacy);
     }
 
     public Task SaveAsync(KitCatalog catalog, CancellationToken cancellationToken = default) =>
         AtomicJsonFile.WriteAsync(_paths.KitsFile, catalog, Options, cancellationToken);
+
+    private void CreateBackup(string destination)
+    {
+        if (!File.Exists(destination)) File.Copy(_paths.KitsFile, destination);
+    }
+
+    private static KitCatalog MigrateVersionTwo(VersionTwoKitCatalog catalog)
+    {
+        var kits = (catalog.Kits ?? []).Select(kit => new KitDefinition(
+            kit.Id,
+            kit.Name ?? "Kit",
+            kit.IsVanilla,
+            (kit.CleanModeAppIds ?? []).Distinct().Select(id =>
+                new CleanModeAction(id, CleanCloseMode.ForceIfNeeded, 0, true)).ToList(),
+            (kit.LaunchAppIds ?? []).Distinct().Select(id =>
+                new LaunchAppAction(id, 0, true)).ToList())).ToList();
+        return new KitCatalog(KitCatalog.CurrentSchemaVersion, catalog.ActiveKitId,
+            catalog.Applications ?? [], kits);
+    }
 
     private static KitCatalog MigrateLegacy(LegacyKitCatalog legacy)
     {
@@ -56,8 +82,10 @@ public sealed class JsonKitRepository : IKitRepository
             kit.Id,
             kit.Name ?? "Kit",
             kit.IsVanilla,
-            (kit.CleanModeApps ?? []).Where(IsValidTarget).Select(Register).Distinct().ToList(),
-            (kit.LaunchApps ?? []).Where(IsValidTarget).Select(Register).Distinct().ToList())).ToList();
+            (kit.CleanModeApps ?? []).Where(IsValidTarget).Select(Register).Distinct().Select(id =>
+                new CleanModeAction(id, CleanCloseMode.ForceIfNeeded, 0, true)).ToList(),
+            (kit.LaunchApps ?? []).Where(IsValidTarget).Select(Register).Distinct().Select(id =>
+                new LaunchAppAction(id, 0, true)).ToList())).ToList();
 
         return new KitCatalog(KitCatalog.CurrentSchemaVersion, legacy.ActiveKitId, applications, kits);
     }
@@ -72,4 +100,8 @@ public sealed class JsonKitRepository : IKitRepository
     private sealed record LegacyKitDefinition(Guid Id, string? Name, bool IsVanilla,
         List<LegacyApplicationTarget>? CleanModeApps, List<LegacyApplicationTarget>? LaunchApps);
     private sealed record LegacyApplicationTarget(string? ExecutablePath, string? DisplayName);
+    private sealed record VersionTwoKitCatalog(Guid ActiveKitId, List<ApplicationDefinition>? Applications,
+        List<VersionTwoKitDefinition>? Kits);
+    private sealed record VersionTwoKitDefinition(Guid Id, string? Name, bool IsVanilla,
+        List<Guid>? CleanModeAppIds, List<Guid>? LaunchAppIds);
 }

@@ -12,6 +12,9 @@ var tests = new (string Name, Func<Task> Run)[]
     ("rejects a non-CS2 executable", RejectsNonCs2ExecutableAsync),
     ("persists configuration as JSON", PersistsConfigurationAsync),
     ("migrates legacy Kits into the App Library", MigratesLegacyKitsAsync),
+    ("migrates Foundation actions without behavior changes", MigratesFoundationActionsAsync),
+    ("preserves legacy recovery defaults", PreservesLegacyRecoveryDefaultsAsync),
+    ("persists per-application action settings", PersistsActionSettingsAsync),
     ("shares App Library entries across Kits", SharesApplicationsAcrossKitsAsync),
     ("persists language preference", PersistsLanguagePreferenceAsync),
     ("persists completed sessions", PersistsSessionsAsync)
@@ -47,7 +50,8 @@ static async Task RecordsSessionAsync()
     var cleanApp = new ApplicationDefinition(Guid.NewGuid(), "Chat", @"C:\Apps\chat.exe");
     var launchApp = new ApplicationDefinition(Guid.NewGuid(), "Music", @"C:\Apps\music.exe");
     var custom = new KitDefinition(Guid.NewGuid(), "Competitive", false,
-        [cleanApp.Id], [launchApp.Id]);
+        [new CleanModeAction(cleanApp.Id, CleanCloseMode.Normal, 5, false)],
+        [new LaunchAppAction(launchApp.Id, 10, false)]);
     var context = new TestContext(new GameConfiguration(path), new KitCatalog(
         KitCatalog.CurrentSchemaVersion, custom.Id, [cleanApp, launchApp],
         [KitCatalog.CreateDefault().Kits[0], custom]));
@@ -58,6 +62,12 @@ static async Task RecordsSessionAsync()
     await context.Watcher.EmitAsync(new GameProcessChange(GameProcessChangeKind.Stopped, 42, path));
 
     Assert(context.Actions.ApplyCount == 1 && context.Actions.RestoreCount == 1, "Kit must apply and restore once.");
+    Assert(context.Actions.LastPlan?.CleanModeActions.Single().CloseMode is CleanCloseMode.Normal,
+        "Clean close mode was not passed to the action coordinator.");
+    Assert(context.Actions.LastPlan?.CleanModeActions.Single().DelaySeconds == 5,
+        "Clean delay was not passed to the action coordinator.");
+    Assert(context.Actions.LastPlan?.LaunchAppActions.Single().CloseAfterSession is false,
+        "Launch restore behavior was not passed to the action coordinator.");
     Assert(context.Sessions.Records.Count == 1, "Completed session was not persisted.");
     Assert(context.Sessions.Records[0].Metrics.SampleCount == 2, "Session metrics were not persisted.");
     Assert(context.Recovery.State is null, "Recovery state must clear after restore.");
@@ -145,10 +155,114 @@ static async Task MigratesLegacyKitsAsync()
         Assert(migrated?.SchemaVersion == KitCatalog.CurrentSchemaVersion, "Schema version was not migrated.");
         Assert(File.Exists(paths.KitsV1BackupFile), "The legacy Kits backup was not created.");
         Assert(migrated?.Applications.Count == 1, "A shared legacy executable should become one library app.");
-        Assert(migrated?.Kits.Single().CleanModeAppIds.Single() == migrated?.Applications.Single().Id,
+        Assert(migrated?.Kits.Single().CleanModeActions.Single().ApplicationId == migrated?.Applications.Single().Id,
             "Clean Mode did not reference the migrated app.");
-        Assert(migrated?.Kits.Single().LaunchAppIds.Single() == migrated?.Applications.Single().Id,
+        Assert(migrated?.Kits.Single().LaunchAppActions.Single().ApplicationId == migrated?.Applications.Single().Id,
             "Launch Apps did not reference the migrated app.");
+        Assert(migrated?.Kits.Single().CleanModeActions.Single().CloseMode is CleanCloseMode.ForceIfNeeded,
+            "Legacy Clean Mode behavior was not preserved.");
+    }
+    finally { if (Directory.Exists(directory)) Directory.Delete(directory, true); }
+}
+
+static async Task MigratesFoundationActionsAsync()
+{
+    var directory = Path.Combine(Path.GetTempPath(), "kit-v2-migration-" + Guid.NewGuid().ToString("N"));
+    try
+    {
+        var paths = new LocalDataPaths(directory);
+        Directory.CreateDirectory(directory);
+        var kitId = Guid.NewGuid();
+        var applicationId = Guid.NewGuid();
+        await File.WriteAllTextAsync(paths.KitsFile, $$"""
+        {
+          "schemaVersion": 2,
+          "activeKitId": "{{kitId}}",
+          "applications": [
+            { "id": "{{applicationId}}", "displayName": "Chat", "executablePath": "C:\\Apps\\chat.exe" }
+          ],
+          "kits": [
+            {
+              "id": "{{kitId}}",
+              "name": "Foundation",
+              "isVanilla": false,
+              "cleanModeAppIds": [ "{{applicationId}}" ],
+              "launchAppIds": [ "{{applicationId}}" ]
+            }
+          ]
+        }
+        """);
+
+        var migrated = await new JsonKitRepository(paths).LoadAsync();
+        var kit = migrated?.Kits.Single() ?? throw new InvalidOperationException("Migrated Kit missing.");
+        Assert(migrated?.SchemaVersion == KitCatalog.CurrentSchemaVersion, "Foundation schema was not upgraded.");
+        Assert(File.Exists(paths.KitsV2BackupFile), "The Foundation backup was not created.");
+        Assert(kit.CleanModeActions.Single() ==
+               new CleanModeAction(applicationId, CleanCloseMode.ForceIfNeeded, 0, true),
+            "Foundation Clean Mode defaults changed during migration.");
+        Assert(kit.LaunchAppActions.Single() == new LaunchAppAction(applicationId, 0, true),
+            "Foundation Launch Apps defaults changed during migration.");
+    }
+    finally { if (Directory.Exists(directory)) Directory.Delete(directory, true); }
+}
+
+static async Task PreservesLegacyRecoveryDefaultsAsync()
+{
+    var directory = Path.Combine(Path.GetTempPath(), "kit-recovery-migration-" + Guid.NewGuid().ToString("N"));
+    try
+    {
+        var paths = new LocalDataPaths(directory);
+        Directory.CreateDirectory(directory);
+        var sessionId = Guid.NewGuid();
+        var kitId = Guid.NewGuid();
+        await File.WriteAllTextAsync(paths.RecoveryFile, $$"""
+        {
+          "session": {
+            "id": "{{sessionId}}",
+            "processId": 42,
+            "executablePath": "C:\\Games\\CS2\\cs2.exe",
+            "startedAtUtc": "2026-09-26T10:00:00+00:00"
+          },
+          "appliedKit": {
+            "kitId": "{{kitId}}",
+            "kitName": "Legacy",
+            "appliedAtUtc": "2026-09-26T10:00:01+00:00",
+            "closedApplications": [ { "executablePath": "C:\\Apps\\chat.exe" } ],
+            "launchedApplications": [ { "executablePath": "C:\\Apps\\music.exe", "processId": 100 } ]
+          }
+        }
+        """);
+
+        var recovery = await new JsonRecoveryStateRepository(paths).LoadAsync();
+        Assert(recovery?.AppliedKit.ClosedApplications.Single().RestoreAfterSession is true,
+            "Legacy closed applications must still restore.");
+        Assert(recovery?.AppliedKit.LaunchedApplications.Single().CloseAfterSession is true,
+            "Legacy launched applications must still close.");
+    }
+    finally { if (Directory.Exists(directory)) Directory.Delete(directory, true); }
+}
+
+static async Task PersistsActionSettingsAsync()
+{
+    var directory = Path.Combine(Path.GetTempPath(), "kit-action-settings-" + Guid.NewGuid().ToString("N"));
+    try
+    {
+        var paths = new LocalDataPaths(directory);
+        var application = new ApplicationDefinition(Guid.NewGuid(), "Chat", @"C:\Apps\chat.exe");
+        var kit = new KitDefinition(Guid.NewGuid(), "Control", false,
+            [new CleanModeAction(application.Id, CleanCloseMode.Normal, 10, false)],
+            [new LaunchAppAction(application.Id, 5, false)]);
+        var expected = new KitCatalog(KitCatalog.CurrentSchemaVersion, kit.Id, [application],
+            [KitCatalog.CreateDefault().Kits[0], kit]);
+        var repository = new JsonKitRepository(paths);
+        await repository.SaveAsync(expected);
+        var actual = await repository.LoadAsync();
+        var loadedKit = actual?.Kits.Single(candidate => candidate.Id == kit.Id)
+                        ?? throw new InvalidOperationException("Saved Kit missing.");
+        Assert(loadedKit.CleanModeActions.Single() == kit.CleanModeActions.Single(),
+            "Clean Mode settings did not round-trip through kits.json.");
+        Assert(loadedKit.LaunchAppActions.Single() == kit.LaunchAppActions.Single(),
+            "Launch Apps settings did not round-trip through kits.json.");
     }
     finally { if (Directory.Exists(directory)) Directory.Delete(directory, true); }
 }
@@ -169,13 +283,21 @@ static async Task SharesApplicationsAcrossKitsAsync()
         var application = await service.RegisterApplicationAsync(firstPath, "Chat");
         var first = await service.CreateKitAsync("First");
         var second = await service.CreateKitAsync("Second");
-        await service.SaveKitAsync(first with { CleanModeAppIds = [application.Id] });
-        await service.SaveKitAsync(second with { LaunchAppIds = [application.Id] });
+        await service.SaveKitAsync(first with
+        {
+            CleanModeActions = [new CleanModeAction(application.Id, CleanCloseMode.ForceIfNeeded, 0, true)]
+        });
+        await service.SaveKitAsync(second with
+        {
+            LaunchAppActions = [new LaunchAppAction(application.Id, 0, true)]
+        });
         await service.UpdateApplicationAsync(application with { ExecutablePath = secondPath });
 
-        Assert(service.ResolveApplications(service.Catalog.Kits.Single(kit => kit.Id == first.Id).CleanModeAppIds)
+        Assert(service.ResolveApplications(service.Catalog.Kits.Single(kit => kit.Id == first.Id)
+                .CleanModeActions.Select(action => action.ApplicationId))
             .Single().ExecutablePath == Path.GetFullPath(secondPath), "First Kit did not receive the shared path update.");
-        Assert(service.ResolveApplications(service.Catalog.Kits.Single(kit => kit.Id == second.Id).LaunchAppIds)
+        Assert(service.ResolveApplications(service.Catalog.Kits.Single(kit => kit.Id == second.Id)
+                .LaunchAppActions.Select(action => action.ApplicationId))
             .Single().ExecutablePath == Path.GetFullPath(secondPath), "Second Kit did not receive the shared path update.");
     }
     finally { Directory.Delete(directory, true); }
@@ -314,12 +436,25 @@ internal sealed class FakeActions : ISessionActionCoordinator
 {
     public int ApplyCount { get; private set; }
     public int RestoreCount { get; private set; }
-    public Task<ActionExecutionResult> ApplyAsync(KitExecutionPlan kit, DateTimeOffset time, CancellationToken cancellationToken = default)
+    public KitExecutionPlan? LastPlan { get; private set; }
+    public async Task<ActionExecutionResult> ApplyAsync(KitExecutionPlan kit, DateTimeOffset time,
+        Func<AppliedKitState, CancellationToken, Task> onStateChanged,
+        CancellationToken cancellationToken = default)
     {
         ApplyCount++;
-        return Task.FromResult(new ActionExecutionResult(new AppliedKitState(kit.KitId, kit.KitName, time,
-            kit.CleanModeApps.Select(value => new ClosedApplication(value.ExecutablePath)).ToList(),
-            kit.LaunchApps.Select((value, index) => new LaunchedApplication(value.ExecutablePath, index + 100)).ToList()), []));
+        LastPlan = kit;
+        var state = new AppliedKitState(kit.KitId, kit.KitName, time,
+            kit.CleanModeActions.Select(value => new ClosedApplication(value.Application.ExecutablePath)
+            {
+                RestoreAfterSession = value.RestoreAfterSession
+            }).ToList(),
+            kit.LaunchAppActions.Select((value, index) =>
+                new LaunchedApplication(value.Application.ExecutablePath, index + 100)
+                {
+                    CloseAfterSession = value.CloseAfterSession
+                }).ToList());
+        await onStateChanged(state, cancellationToken);
+        return new ActionExecutionResult(state, []);
     }
     public Task<RestoreExecutionResult> RestoreAsync(AppliedKitState state, CancellationToken cancellationToken = default)
     { RestoreCount++; return Task.FromResult(new RestoreExecutionResult([])); }
